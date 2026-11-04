@@ -1,0 +1,242 @@
+{
+  "enabled": {
+    "description": "启用记忆说说",
+    "type": "bool",
+    "default": true
+  },
+  "memory_file": {
+    "description": "记忆文件路径（memory.json）",
+    "type": "string",
+    "default": ""
+  },
+  "diary_dir": {
+    "description": "日记目录",
+    "type": "string",
+    "default": ""
+  },
+  "persona_file": {
+    "description": "人格文件路径（留空用内置简版）",
+    "type": "string",
+    "default": ""
+  },
+  "recent_days": {
+    "description": "读最近几天日记",
+    "type": "int",
+    "default": 3
+  },
+  "schedule_time": {
+    "description": "每天几点生成",
+    "type": "string",
+    "default": "21:30"
+  },
+  "mode": {
+    "description": "draft 只生成草稿；publish 生成并发布",
+    "type": "string",
+    "default": "draft",
+    "options": [
+      "draft",
+      "publish"
+    ],
+    "labels": [
+      "草稿（只生成）",
+      "自动发布"
+    ],
+    "subtitles": [
+      "生成后存草稿，等你看",
+      "生成后直接发到空间"
+    ]
+  },
+  "reply_comments": {
+    "description": "每天顺带回评论",
+    "type": "bool",
+    "default": false
+  },
+  "comments_send": {
+    "description": "评论回复是否真发（关=只记日志）",
+    "type": "bool",
+    "default": false
+  },
+  "comments_limit": {
+    "description": "每次最多回几条评论",
+    "type": "int",
+    "default": 3
+  },
+  "publish_adapter": {
+    "description": "发布方式",
+    "type": "string",
+    "default": "dry_run",
+    "options": [
+      "dry_run",
+      "qzone_daemon",
+      "qzone_native"
+    ],
+    "labels": [
+      "草稿（只写 outbox，不发）",
+      "借 qzone_ultra daemon 发",
+      "Cookie 直连（不依赖 AstrBot）"
+    ],
+    "subtitles": [
+      "最安全，先看效果",
+      "需要 qzone_ultra 已登录",
+      "需要 Cookie 或 OneBot token"
+    ]
+  },
+  "qzone_cookie": {
+    "description": "独立发布用的空间 Cookie（留空则读 state.json 或环境变量）",
+    "type": "string",
+    "default": "",
+    "secret": true
+  },
+  "qzone_state_file": {
+    "description": "qzone_ultra 的 state.json（用 qzone_daemon 时必填）",
+    "type": "string",
+    "default": ""
+  },
+  "llm_base_url": {
+    "description": "LLM 接口地址",
+    "type": "string",
+    "default": "https://api.deepseek.com/v1"
+  },
+  "llm_api_key": {
+    "description": "LLM API Key",
+    "type": "string",
+    "default": "",
+    "secret": true
+  },
+  "llm_model": {
+    "description": "模型名",
+    "type": "string",
+    "default": "deepseek-flash"
+  },
+  "privacy_entities": {
+    "description": "不能出现的实体（逗号分隔）",
+    "type": "string",
+    "default": ""
+  },
+  "privacy_deny_words": {
+    "description": "不能出现的词（逗号分隔）",
+    "type": "string",
+    "default": "主人"
+  },
+  "min_chars": {
+    "description": "说说最短字数",
+    "type": "int",
+    "default": 18
+  },
+  "max_chars": {
+    "description": "说说最长字数",
+    "type": "int",
+    "default": 80
+  },
+  "images_provider": {
+    "description": "配图方式：none / pollinations / doubao / qwen / doubao_free / qwen_free / openai_images",
+    "type": "string",
+    "default": "none",
+    "options": [
+      "none",
+      "pollinations",
+      "doubao",
+      "qwen",
+      "doubao_free",
+      "qwen_free",
+      "openai_images"
+    ],
+    "labels": [
+      "不配图",
+      "免费 Pollinations",
+      "豆包官方",
+      "千问官方",
+      "豆包免费代理",
+      "千问免费代理",
+      "自定义 OpenAI 兼容"
+    ],
+    "subtitles": [
+      "只发文字",
+      "不要 key，质量一般",
+      "Ark 官方接口",
+      "DashScope 官方接口",
+      "本地逆向代理",
+      "本地逆向代理",
+      "自己填 base_url"
+    ]
+  },
+  "images_base_url": {
+    "description": "图像接口 base_url（豆包/千问兼容）",
+    "type": "string",
+    "default": ""
+  },
+  "images_api_key": {
+    "description": "图像接口 Key",
+    "type": "string",
+    "default": "",
+    "secret": true
+  },
+  "images_model": {
+    "description": "图像模型名",
+    "type": "string",
+    "default": ""
+  },
+  "onebot_base_url": {
+    "description": "OneBot HTTP 地址（自动取 Cookie 用）",
+    "type": "string",
+    "default": "http://127.0.0.1:3000"
+  },
+  "onebot_token": {
+    "description": "OneBot access token",
+    "type": "string",
+    "default": "",
+    "secret": true
+  },
+  "onebot_domain": {
+    "description": "取 Cookie 的域名",
+    "type": "string",
+    "default": "user.qzone.qq.com"
+  },
+  "privacy_auto_entities": {
+    "description": "自动从记忆/日记里找敏感实体",
+    "type": "bool",
+    "default": true
+  },
+  "privacy_llm_judge": {
+    "description": "发布前让模型再判断一次隐私",
+    "type": "bool",
+    "default": true
+  },
+  "images_size": {
+    "description": "配图尺寸",
+    "type": "string",
+    "default": "1024x1024",
+    "options": [
+      "1024x1024",
+      "1024x1536",
+      "1536x1024",
+      "512x512"
+    ],
+    "labels": [
+      "方形 1024",
+      "竖图 1024×1536",
+      "横图 1536×1024",
+      "小图 512"
+    ]
+  },
+  "comment_watch": {
+    "description": "自动监听并回复新评论",
+    "type": "bool",
+    "default": false
+  },
+  "comment_poll_minutes": {
+    "description": "评论轮询间隔（分钟）",
+    "type": "int",
+    "default": 5
+  },
+  "comments_per_hour": {
+    "description": "每小时最多回几条",
+    "type": "int",
+    "default": 3
+  },
+  "comments_per_day": {
+    "description": "每天最多回几条",
+    "type": "int",
+    "default": 20
+  }
+}

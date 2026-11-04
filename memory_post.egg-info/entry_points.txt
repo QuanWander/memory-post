@@ -1,0 +1,2 @@
+[console_scripts]
+mem-post = mempost.cli:main

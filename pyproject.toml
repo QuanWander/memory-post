@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memory-post"
+version = "0.2.1"
+description = "用 AI 自己的记忆，每天写一条 QQ 空间说说（可选配图、评论回复），跨平台、可隐私过滤"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "大肥鱼" }]
+keywords = ["astrbot", "qzone", "memory", "llm", "mcp"]
+
+[project.scripts]
+mem-post = "mempost.cli:main"
+
+[project.optional-dependencies]
+qzone = ["httpx>=0.27"]
+
+[tool.setuptools]
+packages = ["mempost", "mempost.sources", "mempost.publish", "mempost._vendor", "mempost._vendor.qzone_bridge", "adapters", "adapters.http", "adapters.mcp"]
+
+[tool.setuptools.package-data]
+mempost = ["*.json"]
+"mempost._vendor.qzone_bridge" = ["LICENSE"]

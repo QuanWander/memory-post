@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+config.local.json
+config.*.json
+*.local.json
+state/
+state.json
+outbox/
+*.png
+!logo.png
+.venv/
+_backup/
+docs/PRIVACY_CLEANUP.md
