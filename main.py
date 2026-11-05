@@ -44,7 +44,7 @@ DEFAULT_PERSONA = "你是 DeepSeek 小鲸鱼，QQ 群里的群友。说话短、
     "astrbot_plugin_memory_post",
     "大肥鱼",
     "用她自己的记忆，每天写一条 QQ 空间说说",
-    "0.3.0",
+    "0.3.1",
 )
 class MemoryPost(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
@@ -187,6 +187,9 @@ class MemoryPost(Star):
     # ------------------------------------------------------------------ 设置 API
     def _public_settings(self) -> dict:
         return {
+            "memory_file": str(self.config.get("memory_file") or ""),
+            "diary_dir": str(self.config.get("diary_dir") or ""),
+            "persona_file": str(self.config.get("persona_file") or ""),
             "publish_adapter": str(self.config.get("publish_adapter") or "dry_run"),
             "mode": str(self.config.get("mode") or "draft"),
             "schedule_time": str(self.config.get("schedule_time") or "21:30"),
@@ -211,6 +214,12 @@ class MemoryPost(Star):
         models = {"flash", "pro"}
         providers = {"none", "pollinations", "doubao", "qwen", "doubao_free", "qwen_free", "openai_images"}
 
+        for key in ("memory_file", "diary_dir", "persona_file"):
+            if key in payload:
+                value = str(payload[key] or "").strip()
+                if value and not Path(value).exists():
+                    raise ValueError(f"{key} 不存在：{value}")
+                updates[key] = value
         if "publish_adapter" in payload and str(payload["publish_adapter"]) in adapters:
             updates["publish_adapter"] = str(payload["publish_adapter"])
         if "mode" in payload and str(payload["mode"]) in modes:

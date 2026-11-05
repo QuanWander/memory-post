@@ -369,8 +369,10 @@ async function checkOnboarding() {
   try {
     const data = await bridge.apiGet("onboarding/status");
     onboardingBanner.hidden = Boolean(data.ready);
+    onboardingBanner.style.display = data.ready ? "none" : "flex";
   } catch {
     onboardingBanner.hidden = true;
+    onboardingBanner.style.display = "none";
   }
 }
 
