@@ -261,6 +261,7 @@ h1 {
   border-color: var(--pink); box-shadow: 0 0 0 3px rgba(255, 143, 196, .15);
 }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.field-group input.switch { width: 42px; height: 24px; margin-top: 0; flex: 0 0 auto; }
 .switch {
   appearance: none; width: 42px; height: 24px; margin: 0 !important; border-radius: 999px;
   background: rgba(140, 130, 160, .25); position: relative; cursor: pointer; transition: background .18s ease;
