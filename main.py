@@ -44,7 +44,7 @@ DEFAULT_PERSONA = "你是 DeepSeek 小鲸鱼，QQ 群里的群友。说话短、
     "astrbot_plugin_memory_post",
     "大肥鱼",
     "用她自己的记忆，每天写一条 QQ 空间说说",
-    "0.2.7",
+    "0.2.8",
 )
 class MemoryPost(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
