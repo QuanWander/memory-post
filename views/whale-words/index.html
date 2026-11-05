@@ -47,16 +47,20 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg>
           <span class="btn-label">生成一条</span>
         </button>
+        <button id="settingsBtn" class="btn ghost" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          <span class="btn-label">设置</span>
+        </button>
       </div>
 
-'      <p class="tip">✦ 发布前先看一眼，不满意就删掉重生成</p>
+      <p class="tip">✦ 发布前先看一眼，不满意就删掉重生成</p>
 
       <div class="list-head">
         <span class="list-title">✿ 待审核</span>
         <span class="list-hint" id="listHint">—</span>
       </div>
 
-      <section id="list" class="list"></section>'
+      <section id="list" class="list"></section>
       <div id="empty" class="empty" hidden>
         <div class="empty-bubble">
           <img src="./logo.png" alt="" />
@@ -64,6 +68,7 @@
         <p class="empty-title">还没有草稿</p>
         <p class="muted">点「生成一条」，让她用自己的口吻写一条</p>
       </div>
+      <footer class="footer">made with ♡ · 大肥鱼</footer>
     </div>
 
     <div id="modal" class="modal" hidden>
@@ -76,6 +81,100 @@
           <button id="modalOk" class="btn primary" type="button">确定</button>
         </div>
       </div>
+    </div>
+
+    <div id="settings" class="drawer" hidden>
+      <div class="drawer-mask" data-close="1"></div>
+      <aside class="drawer-panel" role="dialog" aria-modal="true">
+        <header class="drawer-head">
+          <div>
+            <p class="eyebrow">Whale Words</p>
+            <h2>设置</h2>
+          </div>
+          <button class="icon-btn" id="settingsClose" type="button" aria-label="关闭">✕</button>
+        </header>
+
+        <form id="settingsForm" class="settings-form">
+          <section class="field-group">
+            <h3>发布</h3>
+            <label>发布方式
+              <select data-key="publish_adapter">
+                <option value="dry_run">草稿（只写 outbox）</option>
+                <option value="qzone_daemon">借 qzone_ultra daemon 发</option>
+                <option value="qzone_native">Cookie 直连（不依赖 AstrBot）</option>
+              </select>
+            </label>
+            <label>运行模式
+              <select data-key="mode">
+                <option value="draft">草稿（只生成）</option>
+                <option value="publish">自动发布</option>
+              </select>
+            </label>
+            <label>每天几点生成
+              <input data-key="schedule_time" type="time" />
+            </label>
+          </section>
+
+          <section class="field-group">
+            <h3>模型</h3>
+            <label>写说说用
+              <select data-key="llm_model">
+                <option value="flash">Flash（快、便宜）</option>
+                <option value="pro">Pro（文采更好）</option>
+              </select>
+            </label>
+            <p class="hint">自动取该系列当前最新版本，不用手动填版本号。</p>
+          </section>
+
+          <section class="field-group">
+            <h3>评论</h3>
+            <label class="switch-row">
+              <span>自动回复新评论</span>
+              <input data-key="comment_watch" type="checkbox" class="switch" />
+            </label>
+            <label class="switch-row">
+              <span>真的发出去（关 = 只预览）</span>
+              <input data-key="comments_send" type="checkbox" class="switch" />
+            </label>
+            <div class="grid-3">
+              <label>轮询（分钟）<input data-key="comment_poll_minutes" type="number" min="1" max="240" /></label>
+              <label>每小时上限<input data-key="comments_per_hour" type="number" min="1" max="60" /></label>
+              <label>每天上限<input data-key="comments_per_day" type="number" min="1" max="200" /></label>
+            </div>
+          </section>
+
+          <section class="field-group">
+            <h3>配图</h3>
+            <label>配图方式
+              <select data-key="images_provider">
+                <option value="none">不配图</option>
+                <option value="pollinations">免费 Pollinations</option>
+                <option value="doubao">豆包官方</option>
+                <option value="qwen">千问官方</option>
+                <option value="doubao_free">豆包免费代理</option>
+                <option value="qwen_free">千问免费代理</option>
+                <option value="openai_images">自定义 OpenAI 兼容</option>
+              </select>
+            </label>
+            <label>模型名<input data-key="images_model" type="text" placeholder="留空不修改" /></label>
+            <label>base_url<input data-key="images_base_url" type="text" placeholder="留空不修改" /></label>
+            <label>API Key<input data-key="images_api_key" type="password" placeholder="留空不修改；填 *** 也不修改" /></label>
+          </section>
+
+          <section class="field-group">
+            <h3>隐私</h3>
+            <label>额外实体（逗号分隔，可不填）
+              <textarea data-key="privacy_entities" rows="3" placeholder="学校名, 姓名, QQ"></textarea>
+            </label>
+            <p class="hint">自动实体发现和模型复核默认开启；这里只补充硬规则。</p>
+          </section>
+
+          <div class="drawer-actions">
+            <button type="button" class="btn ghost" id="settingsCancel">取消</button>
+            <button type="submit" class="btn primary" id="settingsSave">保存</button>
+          </div>
+        </form>
+      </aside>
     </div>
 
     <div id="toast" class="toast" hidden></div>

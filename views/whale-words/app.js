@@ -1,3 +1,5 @@
+const hadPluginBridge = !!window.AstrBotPluginView;
+
 if (!window.AstrBotPluginView) {
   const request = async (method, endpoint, params, body) => {
     const url = new URL("/v1/" + endpoint, location.origin);
@@ -33,6 +35,11 @@ const modalText = document.getElementById("modalText");
 const modalOk = document.getElementById("modalOk");
 const modalCancel = document.getElementById("modalCancel");
 const toastEl = document.getElementById("toast");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsEl = document.getElementById("settings");
+const settingsForm = document.getElementById("settingsForm");
+const settingsClose = document.getElementById("settingsClose");
+const settingsCancel = document.getElementById("settingsCancel");
 
 let toastTimer = null;
 
@@ -192,6 +199,79 @@ function render(drafts) {
 
     listEl.appendChild(card);
   }
+}
+
+function fillSettings(cfg) {
+  for (const el of settingsForm.querySelectorAll("[data-key]")) {
+    const key = el.dataset.key;
+    if (key === "images_api_key") {
+      el.value = "";
+      continue;
+    }
+    const value = cfg[key];
+    if (el.type === "checkbox") {
+      el.checked = Boolean(value);
+    } else {
+      el.value = value ?? "";
+    }
+  }
+}
+
+async function openSettings() {
+  try {
+    const data = await bridge.apiGet("config");
+    fillSettings(data.config || {});
+    settingsEl.hidden = false;
+  } catch (error) {
+    toast("打开设置失败：" + error.message, true);
+  }
+}
+
+function closeSettings() {
+  settingsEl.hidden = true;
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  const payload = {};
+  for (const el of settingsForm.querySelectorAll("[data-key]")) {
+    const key = el.dataset.key;
+    if (key === "images_api_key" && !el.value.trim()) continue;
+    if (el.type === "checkbox") {
+      payload[key] = el.checked;
+    } else if (el.type === "number") {
+      payload[key] = Number(el.value);
+    } else {
+      payload[key] = el.value;
+    }
+  }
+  const saveBtn = document.getElementById("settingsSave");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "保存中…";
+  try {
+    const result = await bridge.apiPost("config", payload);
+    fillSettings(result.config || {});
+    closeSettings();
+    toast("设置已保存");
+    await load();
+  } catch (error) {
+    toast("保存失败：" + error.message, true);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "保存";
+  }
+}
+
+if (!hadPluginBridge) {
+  settingsBtn.hidden = true;
+} else {
+  settingsBtn.addEventListener("click", openSettings);
+  settingsClose.addEventListener("click", closeSettings);
+  settingsCancel.addEventListener("click", closeSettings);
+  for (const mask of settingsEl.querySelectorAll("[data-close]")) {
+    mask.addEventListener("click", closeSettings);
+  }
+  settingsForm.addEventListener("submit", saveSettings);
 }
 
 refreshBtn.addEventListener("click", load);

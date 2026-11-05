@@ -42,7 +42,7 @@ DEFAULT_PERSONA = "你是 DeepSeek 小鲸鱼，QQ 群里的群友。说话短、
     "astrbot_plugin_memory_post",
     "大肥鱼",
     "用她自己的记忆，每天写一条 QQ 空间说说",
-    "0.2.5",
+    "0.2.6",
 )
 class MemoryPost(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
@@ -56,6 +56,7 @@ class MemoryPost(Star):
         context.register_web_api("/astrbot_plugin_memory_post/drafts/delete", self.page_delete, ["POST"], "Delete draft")
         context.register_web_api("/astrbot_plugin_memory_post/drafts/image", self.page_image, ["GET"], "Draft image")
         context.register_web_api("/astrbot_plugin_memory_post/generate", self.page_generate, ["POST"], "Generate draft")
+        context.register_web_api("/astrbot_plugin_memory_post/config", self.page_config, ["GET", "POST"], "Plugin settings")
 
     # ------------------------------------------------------------------ 页面 API
     async def page_drafts(self):
@@ -103,6 +104,96 @@ class MemoryPost(Star):
     async def page_generate(self):
         result = await asyncio.to_thread(self._generate_sync)
         return json_response(result)
+
+    # ------------------------------------------------------------------ 设置 API
+    def _public_settings(self) -> dict:
+        return {
+            "publish_adapter": str(self.config.get("publish_adapter") or "dry_run"),
+            "mode": str(self.config.get("mode") or "draft"),
+            "schedule_time": str(self.config.get("schedule_time") or "21:30"),
+            "llm_model": str(self.config.get("llm_model") or "flash"),
+            "images_provider": str(self.config.get("images_provider") or "none"),
+            "images_model": str(self.config.get("images_model") or ""),
+            "images_base_url": str(self.config.get("images_base_url") or ""),
+            "images_api_key_set": bool(self.config.get("images_api_key")),
+            "comment_watch": bool(self.config.get("comment_watch", False)),
+            "comment_poll_minutes": int(self.config.get("comment_poll_minutes") or 10),
+            "comments_send": bool(self.config.get("comments_send", False)),
+            "comments_per_hour": int(self.config.get("comments_per_hour") or 3),
+            "comments_per_day": int(self.config.get("comments_per_day") or 20),
+            "privacy_entities": str(self.config.get("privacy_entities") or ""),
+            "enabled": bool(self.config.get("enabled", True)),
+        }
+
+    def _validate_settings(self, payload: dict) -> dict:
+        updates: dict = {}
+        adapters = {"dry_run", "qzone_daemon", "qzone_native"}
+        modes = {"draft", "publish"}
+        models = {"flash", "pro"}
+        providers = {"none", "pollinations", "doubao", "qwen", "doubao_free", "qwen_free", "openai_images"}
+
+        if "publish_adapter" in payload and str(payload["publish_adapter"]) in adapters:
+            updates["publish_adapter"] = str(payload["publish_adapter"])
+        if "mode" in payload and str(payload["mode"]) in modes:
+            updates["mode"] = str(payload["mode"])
+        if "schedule_time" in payload:
+            value = str(payload["schedule_time"]).strip()
+            if re.fullmatch(r"([01]?\d|2[0-3]):[0-5]\d", value):
+                updates["schedule_time"] = value
+        if "llm_model" in payload and str(payload["llm_model"]) in models:
+            updates["llm_model"] = str(payload["llm_model"])
+        if "images_provider" in payload and str(payload["images_provider"]) in providers:
+            updates["images_provider"] = str(payload["images_provider"])
+        for key in ("images_model", "images_base_url"):
+            if key in payload:
+                updates[key] = str(payload[key] or "").strip()[:300]
+        if payload.get("images_api_key") and str(payload["images_api_key"]) != "***":
+            updates["images_api_key"] = str(payload["images_api_key"]).strip()[:300]
+        for key in ("comment_watch", "comments_send", "enabled"):
+            if key in payload:
+                updates[key] = bool(payload[key])
+        for key, lo, hi, default in (
+            ("comment_poll_minutes", 1, 240, 10),
+            ("comments_per_hour", 1, 60, 3),
+            ("comments_per_day", 1, 200, 20),
+        ):
+            if key in payload:
+                try:
+                    updates[key] = max(lo, min(hi, int(payload[key])))
+                except (TypeError, ValueError):
+                    updates[key] = default
+        if "privacy_entities" in payload:
+            raw = payload["privacy_entities"]
+            if isinstance(raw, list):
+                raw = ",".join(str(x).strip() for x in raw if str(x).strip())
+            updates["privacy_entities"] = str(raw or "").strip()[:1000]
+        return updates
+
+    async def _restart_comment_task(self) -> None:
+        if self._comment_task:
+            self._comment_task.cancel()
+            self._comment_task = None
+        if bool(self.config.get("comment_watch", False)):
+            self._comment_task = asyncio.create_task(self._comment_watch_loop())
+
+    async def page_config(self):
+        if request.method == "GET":
+            return json_response({"config": self._public_settings()})
+        payload = await request.json(default={})
+        if not isinstance(payload, dict):
+            return error_response("bad payload", status_code=400)
+        updates = self._validate_settings(payload)
+        try:
+            self.config.update(updates)
+            save = getattr(self.config, "save_config", None)
+            if callable(save):
+                save()
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("[memory-post] 保存配置失败")
+            return error_response(str(exc), status_code=500)
+        await self._restart_comment_task()
+        logger.info("[memory-post] 设置已更新：%s", ",".join(updates.keys()))
+        return json_response({"ok": True, "config": self._public_settings()})
 
     # ------------------------------------------------------------------ 配置
     def _split(self, key: str, default: str = "") -> list[str]:

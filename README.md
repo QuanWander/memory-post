@@ -4,7 +4,7 @@
 
 给 AI 角色用的 QQ 空间说说生成器：读记忆和日记 → 用她的人格写 → 过隐私 → 草稿或自动发 → 还能回评论。
 
-![version](https://img.shields.io/badge/version-0.2.5-blue)
+![version](https://img.shields.io/badge/version-0.2.6-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![tests](https://img.shields.io/badge/tests-52%20passed-brightgreen)
@@ -52,7 +52,7 @@ memory-post 反过来：**先看她知道什么，再决定发什么。**
 
 ```bash
 # 1. 装
-pip install memory_post-0.2.5-py3-none-any.whl
+pip install memory_post-0.2.6-py3-none-any.whl
 
 # 2. 生成配置（AstrBot 用户可加 --preset astrbot 自动猜路径）
 mem-post init --config config.json --preset astrbot
@@ -93,6 +93,20 @@ mem-post publish --config config.json
 - 不读别人的空间，只处理自己最近的说说和评论
 - 不生成视频、不支持多图
 - 免费网页版豆包/千问没有公开 API，配图要自己填 key；没 key 就只发文字
+
+
+
+## 可视化设置
+
+「鲸语拾光」右上角「设置」可以直接改：
+
+- 发布方式、运行模式、每天几点生成
+- 模型：flash / pro（自动取最新版本）
+- 评论：自动回复开关、轮询间隔、每小时/每天上限
+- 配图：provider、模型、base_url、API Key
+- 隐私：额外实体名单
+
+保存会写回插件配置，并重启评论监听任务；API Key 留空表示不修改。
 
 ## 配置
 
