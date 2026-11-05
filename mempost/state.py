@@ -116,9 +116,12 @@ class Store:
         data["replied"] = replied[-1000:]
         self._save(data)
 
-    def recent_texts(self, limit: int = 7) -> list[str]:
+    def recent_texts(self, limit: int = 7, include_drafts: bool = False) -> list[str]:
         data = self._load()
-        return [str(p.get("text") or "") for p in data["posts"][-limit:]]
+        posts = [str(p.get("text") or "") for p in data["posts"][-limit:]]
+        if include_drafts:
+            posts += [str(d.get("text") or "") for d in data["drafts"][-limit:]]
+        return posts[-limit:]
 
     def replied_ids(self) -> set[str]:
         data = self._load()

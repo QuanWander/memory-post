@@ -52,13 +52,13 @@ def _prepare(cfg: dict, config_path: Path, *, with_image: bool = False):
     store = Store(config_path.parent / "state.json")
     variant = pick(cfg, len(store.posts()))
     persona = _persona(cfg, config_path)
-    result = compose(cfg, persona, variant, memories, diary_digest(diary), store.recent_texts(7), guard)
+    result = compose(cfg, persona, variant, memories, diary_digest(diary), store.recent_texts(7, include_drafts=True), guard)
     issues = lint(
         result.text,
         guard,
         min_chars=int((cfg.get("privacy") or {}).get("min_chars") or 18),
         max_chars=int((cfg.get("privacy") or {}).get("max_chars") or 80),
-        recent=store.recent_texts(7),
+        recent=store.recent_texts(7, include_drafts=True),
         similarity_threshold=float((cfg.get("privacy") or {}).get("similarity_threshold") or 0.55),
     )
     image_path = ""

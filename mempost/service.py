@@ -59,13 +59,13 @@ def preview(config_path: str | Path, *, with_image: bool = False) -> dict:
         )
     store = Store(path.parent / "state.json")
     variant = pick(cfg, len(store.posts()))
-    result = compose(cfg, _persona(cfg, path), variant, memories, diary_text, store.recent_texts(7), guard, llm=llm)
+    result = compose(cfg, _persona(cfg, path), variant, memories, diary_text, store.recent_texts(7, include_drafts=True), guard, llm=llm)
     issues = lint(
         result.text,
         guard,
         min_chars=int(privacy.get("min_chars") or 18),
         max_chars=int(privacy.get("max_chars") or 80),
-        recent=store.recent_texts(7),
+        recent=store.recent_texts(7, include_drafts=True),
         similarity_threshold=float(privacy.get("similarity_threshold") or 0.55),
     )
     if not issues and bool(privacy.get("llm_judge", True)):

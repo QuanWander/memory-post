@@ -42,7 +42,7 @@ DEFAULT_PERSONA = "你是 DeepSeek 小鲸鱼，QQ 群里的群友。说话短、
     "astrbot_plugin_memory_post",
     "大肥鱼",
     "用她自己的记忆，每天写一条 QQ 空间说说",
-    "0.2.2",
+    "0.2.3",
 )
 class MemoryPost(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
@@ -155,13 +155,13 @@ class MemoryPost(Star):
         auto_hints: list[str] = []
         if cfg["privacy"].get("auto_entities", True):
             auto_hints = discover(llm, [m.text for m in memories], diary_text, self._base / "state" / "privacy_entities.json")
-        result = compose(cfg, persona, variant, memories, diary_text, store.recent_texts(7), guard, llm=llm)
+        result = compose(cfg, persona, variant, memories, diary_text, store.recent_texts(7, include_drafts=True), guard, llm=llm)
         issues = lint(
             result.text,
             guard,
             min_chars=cfg["privacy"]["min_chars"],
             max_chars=cfg["privacy"]["max_chars"],
-            recent=store.recent_texts(7),
+            recent=store.recent_texts(7, include_drafts=True),
             similarity_threshold=cfg["privacy"]["similarity_threshold"],
         )
         if not issues and cfg["privacy"].get("llm_judge", True):

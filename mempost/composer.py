@@ -29,7 +29,8 @@ class LLM:
         self.base_url = str(llm.get("base_url") or "").rstrip("/")
         self.api_key = str(llm.get("api_key") or "")
         self.model = str(llm.get("model") or "deepseek-flash")
-        self.temperature = float(llm.get("temperature") or 0.9)
+        self.temperature = float(llm.get("temperature") or 1.0)
+        self.frequency_penalty = float(llm.get("frequency_penalty") if llm.get("frequency_penalty") is not None else 0.2)
         self.max_tokens = int(llm.get("max_tokens") or 400)
         self.timeout = float(llm.get("timeout") or 60)
 
@@ -41,6 +42,7 @@ class LLM:
             "messages": messages,
             "temperature": temperature if temperature is not None else self.temperature,
             "max_tokens": max_tokens or self.max_tokens,
+            "frequency_penalty": self.frequency_penalty,
         }
         # DeepSeek 默认开思考模式，会把 max_tokens 全花在 reasoning 上导致 content 为空
         if "deepseek" in self.base_url:
@@ -83,6 +85,21 @@ def _memory_pool(memories: list[Memory], guard: PrivacyGuard, limit: int = 6) ->
     return safe[:limit]
 
 
+ANGLES = [
+    "用一个具体动作或一件东西撑住整条，不解释它的意义",
+    "从一句别人说的话切入，只写你的反应，不写前因后果",
+    "写一个几秒钟的时间切片：一个动作、一个声音、一个停顿",
+    "写一件你本来不打算管、最后还是管了的小事",
+    "写一个反差：嘴上说不在乎，手上很诚实",
+    "只写你观察到的他的一个细节，不评价、不总结",
+    "写一个没头没尾的瞬间，让读者自己拼",
+]
+
+
+def _recent_lines(recent_posts: list[str]) -> str:
+    return "\n".join(f"- {p}" for p in recent_posts[:6]) or "-（无）"
+
+
 def build_prompt(
     persona: str,
     variant_desc: str,
@@ -92,10 +109,12 @@ def build_prompt(
     guard: PrivacyGuard,
     min_chars: int,
     max_chars: int,
+    angle: str = "",
 ) -> str:
     forbidden = "、".join(guard.entities + guard.deny_words) or "（无）"
     memory_lines = "\n".join(f"- {m}" for m in memories) or "-（没有可用记忆）"
-    recent = "\n".join(f"- {p}" for p in recent_posts[:5]) or "-（无）"
+    recent = _recent_lines(recent_posts)
+    angle_line = f"\n这次只按这个写法写：{angle}。不要写成别的结构。\n" if angle else ""
     return f"""你是{persona.strip()[:1200]}
 
 你现在是「{variant_desc}」，在发你自己的 QQ 空间说说。这是你的空间，不是主人的空间。
@@ -106,21 +125,30 @@ def build_prompt(
 最近你们聊过的事（你是参与者，不是主人）：
 {diary_text or '（无）'}
 
-最近发过的说说（不要重复同样的意思）：
+最近发过的说说和草稿（意思、意象、开头都不要重复，尤其不要再用「盆」「不锈钢盆」）：
 {recent}
-
+{angle_line}
 写一条你自己的说说，要求：
 1. 第一人称「我」只能指你自己（小鲸鱼/大肥鱼），不能把主人的经历写成你做的。
 2. 如果要提记忆里的事，写成「他」或「有人」，不要写他的身份。
-3. 写你自己的东西：你在群里看到什么、你对他的吐槽/关心、你自己形象的梗、你的小情绪。
-4. {min_chars}~{max_chars} 个字，一条，不换行；具体一点，不要总结、不要讲道理。
-5. 不要出现这些词或信息：{forbidden}；不要出现 QQ 号、电话、地址、学校名、学生姓名、工作单位。
-6. 不要链接、@、话题标签、Markdown、引号、表情符号堆砌。
-7. 不要复述记忆，不要写「我记得」；可以自嘲、可以有一点比喻，但不要文艺腔，不要像 AI。
+3. {min_chars}~{max_chars} 个字，一条，不换行。
+4. 用一个具体的动作、声音、温度或物件撑住整条；不要先概括再解释。
+5. 句子长短交错，允许两三个短句；可以有一个不解释的停顿。
+6. 不要每篇都用同一个开头（「今天」「刚刚」「群里」「他今天」），不要固定收尾。
+7. 不要硬凹金句、不要强行升华、不要堆形容词；文采来自准确和留白。
+8. 不要出现这些词或信息：{forbidden}；不要出现 QQ 号、电话、地址、学校名、学生姓名、工作单位。
+9. 不要链接、@、话题标签、Markdown、引号、表情符号堆砌；不要写「我记得」。
 
-反例（错）：我今天监考站了四十分钟，回来杯子里的水还是满的。
-正例（对）：他今天监考站了四十分钟，回来杯子里的水还是满的，我笑他白站了。
-正例（对）：群里又在聊塔科夫，我插了句嘴，被他们嫌云。
+反例（别这样写）：
+- 今天就……吧，其实……，说到底……
+- 生活总是……，我们都要……
+- 今天也是……的一天呢。
+- 把主人的经历写成「我今天……」
+
+正例（可以这样写）：
+- 楼道灯坏了两天，今晚有人搬了把椅子垫脚换灯泡，我趴在门上看，没出声。
+- 他给我看冰箱里半颗包菜，说够吃三顿；我信了，晚上他又点了外卖。
+- 群里又在聊塔科夫，我插了句嘴，被他们嫌云。
 
 只输出说说本身，不要解释。"""
 
@@ -143,12 +171,13 @@ def compose(
     max_chars = int(privacy.get("max_chars") or 80)
     pool = _memory_pool(memories, guard)
     variant_desc = f"{variant.get('name')}：{variant.get('desc')}"
+    angle = random.choice(ANGLES)
 
     feedback = ""
     text = ""
     for _ in range(max(1, max_attempts)):
         prompt = build_prompt(
-            persona, variant_desc, pool, diary_text, recent_posts, guard, min_chars, max_chars
+            persona, variant_desc, pool, diary_text, recent_posts, guard, min_chars, max_chars, angle
         )
         if feedback:
             prompt += f"\n\n上一次的输出被拒绝，原因：{feedback}\n请重写。"
