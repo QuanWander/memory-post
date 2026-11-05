@@ -82,11 +82,17 @@ class Store:
         return set(data.get("seen") or [])
 
     def mark_seen(self, comment_key: str) -> None:
+        self.mark_seen_many([comment_key])
+
+    def mark_seen_many(self, comment_keys: list[str]) -> None:
+        if not comment_keys:
+            return
         data = self._load()
         seen = list(data.get("seen") or [])
-        if comment_key not in seen:
-            seen.append(comment_key)
-        data["seen"] = seen[-1000:]
+        for key in comment_keys:
+            if key not in seen:
+                seen.append(key)
+        data["seen"] = seen[-2000:]
         self._save(data)
 
     def comment_reply_times(self) -> list[float]:
@@ -94,11 +100,21 @@ class Store:
         return [float(x) for x in data.get("comment_reply_times") or []]
 
     def mark_comment_reply(self, comment_key: str) -> None:
+        self.record_comment_replies([comment_key])
+
+    def record_comment_replies(self, comment_keys: list[str]) -> None:
+        if not comment_keys:
+            return
         data = self._load()
         times = list(data.get("comment_reply_times") or [])
-        times.append(time.time())
+        replied = list(data.get("replied") or [])
+        for key in comment_keys:
+            times.append(time.time())
+            if key not in replied:
+                replied.append(key)
         data["comment_reply_times"] = times[-500:]
-        self.mark_replied(comment_key)
+        data["replied"] = replied[-1000:]
+        self._save(data)
 
     def recent_texts(self, limit: int = 7) -> list[str]:
         data = self._load()

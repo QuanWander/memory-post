@@ -227,7 +227,7 @@
   "comment_poll_minutes": {
     "description": "评论轮询间隔（分钟）",
     "type": "int",
-    "default": 5
+    "default": 10
   },
   "comments_per_hour": {
     "description": "每小时最多回几条",

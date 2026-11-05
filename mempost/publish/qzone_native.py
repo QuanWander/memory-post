@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,13 @@ from .._vendor.qzone_bridge.parser import (
 
 class QzoneNativeError(RuntimeError):
     pass
+
+
+_COOKIE_CACHE: dict[str, Any] = {"key": "", "cookie": "", "uin": 0, "ts": 0.0}
+
+
+def clear_cookie_cache() -> None:
+    _COOKIE_CACHE.update({"key": "", "cookie": "", "uin": 0, "ts": 0.0})
 
 
 def _state_cookie(state_path: str) -> tuple[str, int]:
@@ -50,17 +58,24 @@ def load_cookie(cfg: dict) -> tuple[str, int]:
     pub = cfg.get("publish") or {}
     raw = str(pub.get("qzone_cookie") or "").strip()
     uin = 0
-    if not raw and str(pub.get("onebot_base_url") or ""):
-        try:
-            from ..onebot_cookie import fetch_cookie
+    fetched_onebot = False
+    base = str(pub.get("onebot_base_url") or "")
+    if not raw and base:
+        token = str(pub.get("onebot_token") or "")
+        domain = str(pub.get("onebot_domain") or "user.qzone.qq.com")
+        cache_key = f"{base}|{token}|{domain}"
+        ttl = float(pub.get("cookie_cache_seconds") or 600)
+        if _COOKIE_CACHE["key"] == cache_key and _COOKIE_CACHE["cookie"] and time.time() - _COOKIE_CACHE["ts"] < ttl:
+            raw = _COOKIE_CACHE["cookie"]
+            uin = int(_COOKIE_CACHE["uin"])
+        else:
+            try:
+                from ..onebot_cookie import fetch_cookie
 
-            raw = fetch_cookie(
-                str(pub.get("onebot_base_url") or ""),
-                str(pub.get("onebot_token") or ""),
-                str(pub.get("onebot_domain") or "user.qzone.qq.com"),
-            )
-        except Exception:  # noqa: BLE001
-            raw = ""
+                raw = fetch_cookie(base, token, domain)
+                fetched_onebot = True
+            except Exception:  # noqa: BLE001
+                raw = ""
     if not raw:
         raw, uin = _state_cookie(str(pub.get("qzone_state_file") or ""))
     if not raw:
@@ -73,6 +88,8 @@ def load_cookie(cfg: dict) -> tuple[str, int]:
     uin = normalize_uin(cookies, override=uin or None)
     if not uin:
         raise QzoneNativeError("Cookie 里找不到 uin / p_uin")
+    if fetched_onebot:
+        _COOKIE_CACHE.update({"key": cache_key, "cookie": raw, "uin": uin, "ts": time.time()})
     return raw, uin
 
 
@@ -143,6 +160,7 @@ def feeds(cfg: dict, limit: int = 5) -> list[dict]:
                 "content": entry.summary,
                 "uin": entry.hostuin,
                 "comments": comments,
+                "comment_count": entry.comment_count,
                 "created_at": entry.created_at,
                 "raw": item,
             }

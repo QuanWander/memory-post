@@ -34,6 +34,7 @@ def normalize_post(item: dict) -> dict:
         "fid": str(_pick(item, "fid", "tid", "id")),
         "content": str(_pick(item, "content", "summary", "text")),
         "uin": int(_pick(item, "hostuin", "uin", "owner", default=0) or 0),
+        "comment_count": int(_pick(item, "comment_count", "commentCount", "cmtnum", default=0) or 0),
         "comments": item.get("comments") or item.get("commentList") or item.get("comment_list") or [],
     }
 

@@ -42,7 +42,7 @@ DEFAULT_PERSONA = "你是 DeepSeek 小鲸鱼，QQ 群里的群友。说话短、
     "astrbot_plugin_memory_post",
     "大肥鱼",
     "用她自己的记忆，每天写一条 QQ 空间说说",
-    "0.2.1",
+    "0.2.2",
 )
 class MemoryPost(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
@@ -236,8 +236,10 @@ class MemoryPost(Star):
         api = QzoneAPI(cfg)
         store = Store(self._base / "state.json")
         seen = store.seen_ids()
-        marked = 0
+        pending: list[str] = []
         for post in [normalize_post(x) for x in api.feeds(5)]:
+            if not post.get("comment_count") and not post.get("comments"):
+                continue
             try:
                 detail = api.detail(post["fid"])
             except (QzoneError, QzoneNativeError):
@@ -245,10 +247,10 @@ class MemoryPost(Star):
             for comment in new_comments([{**post, "comments": detail.get("comments") or []}], api.uin):
                 key = f"{post['fid']}:{comment['commentid']}"
                 if key not in seen:
-                    store.mark_seen(key)
+                    pending.append(key)
                     seen.add(key)
-                    marked += 1
-        return {"baseline": marked}
+        store.mark_seen_many(pending)
+        return {"baseline": len(pending)}
 
     def _watch_once(self) -> dict:
         cfg = self._core_config()
@@ -257,7 +259,10 @@ class MemoryPost(Star):
         seen = store.seen_ids()
         replied = store.replied_ids()
         fresh: list[tuple[dict, dict, str]] = []
+        already: list[str] = []
         for post in [normalize_post(x) for x in api.feeds(5)]:
+            if not post.get("comment_count") and not post.get("comments"):
+                continue
             try:
                 detail = api.detail(post["fid"])
             except (QzoneError, QzoneNativeError):
@@ -266,13 +271,15 @@ class MemoryPost(Star):
                 key = f"{post['fid']}:{comment['commentid']}"
                 if key in seen:
                     continue
-                store.mark_seen(key)
-                seen.add(key)
-                if key not in replied:
-                    fresh.append((post, comment, key))
+                if key in replied:
+                    already.append(key)
+                    continue
+                fresh.append((post, comment, key))
+        store.mark_seen_many(already)
         if not fresh:
             return {"new": 0, "replied": 0}
         if not bool(self.config.get("comments_send", False)):
+            store.mark_seen_many([key for _, _, key in fresh])
             return {"new": len(fresh), "replied": 0, "mode": "dry_run"}
 
         per_hour = int(self.config.get("comments_per_hour") or 3)
@@ -285,17 +292,24 @@ class MemoryPost(Star):
         if cfg["persona_file"] and Path(cfg["persona_file"]).exists():
             persona = Path(cfg["persona_file"]).read_text(encoding="utf-8")
         guard = PrivacyGuard(cfg["privacy"]["entities"], cfg["privacy"]["deny_words"])
-        replied_count = 0
+        success: list[str] = []
         for post, comment, key in fresh:
             if hour_count >= per_hour or day_count >= per_day:
                 break
             text = reply_text(cfg, persona, post.get("content", ""), comment, guard)
-            api.reply(hostuin=api.uin, fid=post["fid"], commentid=comment["commentid"], comment_uin=comment["uin"], content=text)
-            store.mark_comment_reply(key)
+            if not text:
+                continue
+            try:
+                api.reply(hostuin=api.uin, fid=post["fid"], commentid=comment["commentid"], comment_uin=comment["uin"], content=text)
+            except (QzoneError, QzoneNativeError) as exc:
+                logger.warning(f"[memory-post] 评论回复失败，保留重试：{exc}")
+                continue
+            success.append(key)
             hour_count += 1
             day_count += 1
-            replied_count += 1
-        return {"new": len(fresh), "replied": replied_count}
+        store.record_comment_replies(success)
+        return {"new": len(fresh), "replied": len(success), "pending": len(fresh) - len(success)}
+
 
     async def _comment_watch_loop(self) -> None:
         try:
@@ -303,7 +317,7 @@ class MemoryPost(Star):
             logger.info(f"[memory-post] 评论监听基线：{data}")
         except Exception:
             logger.exception("[memory-post] 评论监听基线失败")
-        minutes = max(1, int(self.config.get("comment_poll_minutes") or 5))
+        minutes = max(1, int(self.config.get("comment_poll_minutes") or 10))
         while True:
             await asyncio.sleep(minutes * 60)
             try:
