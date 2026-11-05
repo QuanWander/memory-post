@@ -55,6 +55,14 @@
 
       <p class="tip">✦ 发布前先看一眼，不满意就删掉重生成</p>
 
+      <div id="onboardingBanner" class="onboarding" hidden>
+        <div>
+          <strong>还差一点就能用了</strong>
+          <p>记忆、日记或人格路径还没填全。补上之后，她才知道该记得谁。</p>
+        </div>
+        <button id="onboardBtn" class="btn primary" type="button">去补全</button>
+      </div>
+
       <div class="list-head">
         <span class="list-title">✿ 待审核</span>
         <span class="list-hint" id="listHint">—</span>
@@ -95,6 +103,13 @@
         </header>
 
         <form id="settingsForm" class="settings-form">
+          <section class="field-group">
+            <h3>基础路径</h3>
+            <label>记忆文件<input data-key="memory_file" type="text" placeholder="memory.json 路径" /></label>
+            <label>日记目录<input data-key="diary_dir" type="text" placeholder="大肥鱼日记 路径" /></label>
+            <label>人格文件<input data-key="persona_file" type="text" placeholder="人格 .md 路径" /></label>
+          </section>
+
           <section class="field-group">
             <h3>发布</h3>
             <label>发布方式

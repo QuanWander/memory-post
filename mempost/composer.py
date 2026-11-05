@@ -18,6 +18,8 @@ from .sources import Memory
 class ComposerResult:
     text: str
     used_memories: list[str]
+    angle_id: str = ""
+    angle_label: str = ""
 
 
 class LLMError(RuntimeError):
@@ -140,19 +142,20 @@ def _memory_pool(memories: list[Memory], guard: PrivacyGuard, limit: int = 6) ->
 
 
 ANGLES = [
-    "用一个具体动作或一件东西撑住整条，不解释它的意义",
-    "从一句别人说的话切入，只写你的反应，不写前因后果",
-    "写一个几秒钟的时间切片：一个动作、一个声音、一个停顿",
-    "写一件你本来不打算管、最后还是管了的小事",
-    "写一个反差：嘴上说不在乎，手上很诚实",
-    "只写你观察到的他的一个细节，不评价、不总结",
-    "写一个没头没尾的瞬间，让读者自己拼",
-    "借物喻人：只写一个物件和它被怎么对待，让读者想到某个人或某种关系，不要点破",
-    "以景写情：用光线、温度、声音、天气承载情绪，不直接说心情",
-    "以小见大：写一件很小的事，最后一句轻轻带出一个更大的东西，但不讲道理",
-    "化用：自然带出一个成语、诗句或典故的意象，不标出处、不掉书袋",
-    "留白：写到一半停住，不解释，让读者自己补",
+    {"id": "action", "label": "具体动作", "prompt": "用一个具体动作或一件东西撑住整条，不解释它的意义"},
+    {"id": "dialogue", "label": "一句对话", "prompt": "从一句别人说的话切入，只写你的反应，不写前因后果"},
+    {"id": "moment", "label": "时间切片", "prompt": "写一个几秒钟的时间切片：一个动作、一个声音、一个停顿"},
+    {"id": "small", "label": "一件小事", "prompt": "写一件你本来不打算管、最后还是管了的小事"},
+    {"id": "contrast", "label": "反差", "prompt": "写一个反差：嘴上说不在乎，手上很诚实"},
+    {"id": "detail", "label": "一个细节", "prompt": "只写你观察到的他的一个细节，不评价、不总结"},
+    {"id": "fragment", "label": "没头没尾", "prompt": "写一个没头没尾的瞬间，让读者自己拼"},
+    {"id": "object", "label": "借物喻人", "prompt": "借物喻人：只写一个物件和它被怎么对待，让读者想到某个人或某种关系，不要点破"},
+    {"id": "scene", "label": "以景写情", "prompt": "以景写情：用光线、温度、声音、天气承载情绪，不直接说心情"},
+    {"id": "bigger", "label": "以小见大", "prompt": "以小见大：写一件很小的事，最后一句轻轻带出一个更大的东西，但不讲道理"},
+    {"id": "allusion", "label": "化用", "prompt": "化用：自然带出一个成语、诗句或典故的意象，不标出处、不掉书袋"},
+    {"id": "blank", "label": "留白", "prompt": "留白：写到一半停住，不解释，让读者自己补"},
 ]
+ANGLE_MAP = {a["id"]: a for a in ANGLES}
 
 
 def _recent_lines(recent_posts: list[str]) -> str:
@@ -226,6 +229,7 @@ def compose(
     *,
     llm: LLM | None = None,
     max_attempts: int = 2,
+    angle_id: str | None = None,
 ) -> ComposerResult:
     client = llm or LLM(cfg)
     privacy = cfg.get("privacy") or {}
@@ -233,13 +237,15 @@ def compose(
     max_chars = int(privacy.get("max_chars") or 80)
     pool = _memory_pool(memories, guard)
     variant_desc = f"{variant.get('name')}：{variant.get('desc')}"
-    angle = random.choice(ANGLES)
+    angle = ANGLE_MAP.get(angle_id) if angle_id else None
+    if not angle:
+        angle = random.choice(ANGLES)
 
     feedback = ""
     text = ""
     for _ in range(max(1, max_attempts)):
         prompt = build_prompt(
-            persona, variant_desc, pool, diary_text, recent_posts, guard, min_chars, max_chars, angle
+            persona, variant_desc, pool, diary_text, recent_posts, guard, min_chars, max_chars, angle["prompt"]
         )
         if feedback:
             prompt += f"\n\n上一次的输出被拒绝，原因：{feedback}\n请重写。"
@@ -248,4 +254,4 @@ def compose(
         if not findings and min_chars <= len(text) <= max_chars:
             break
         feedback = "；".join(f"{f.kind}:{f.text}" for f in findings) or f"长度 {len(text)} 不在范围内"
-    return ComposerResult(text=text, used_memories=pool)
+    return ComposerResult(text=text, used_memories=pool, angle_id=angle["id"], angle_label=angle["label"])

@@ -250,5 +250,10 @@
     "description": "每天最多回几条",
     "type": "int",
     "default": 20
+  },
+  "skip_if_no_material": {
+    "description": "没有新素材时不硬发",
+    "type": "bool",
+    "default": true
   }
 }

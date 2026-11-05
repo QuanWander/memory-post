@@ -61,6 +61,7 @@ DEFAULT = {
         "deny_words": ["主人", "主人我", "QQ", "微信", "手机号"],
         "auto_entities": True,
         "llm_judge": True,
+        "skip_if_no_material": True,
         "min_chars": 18,
         "max_chars": 80,
         "similarity_threshold": 0.55,

@@ -283,3 +283,35 @@ h1 {
   .grid-3 { grid-template-columns: 1fr; }
   .drawer-panel { width: 100%; }
 }
+
+/* v0.3 编辑 / 换写法 / 记忆溯源 / 向导 */
+.onboarding {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin: 0 0 16px; padding: 14px 16px; border-radius: 18px;
+  border: 1px dashed rgba(255, 143, 196, .55);
+  background: linear-gradient(135deg, rgba(255, 233, 244, .9), rgba(238, 232, 255, .9));
+}
+.onboarding strong { font-size: 14px; }
+.onboarding p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+[data-theme="dark"] .onboarding { background: rgba(255,255,255,.05); }
+.memories { margin: 10px 0 2px; font-size: 12px; color: var(--muted); }
+.memories summary { cursor: pointer; color: var(--pink-deep); }
+.memories ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
+.edit-box { margin-top: 10px; }
+.edit-box textarea {
+  width: 100%; min-height: 82px; resize: vertical; padding: 10px 12px;
+  border: 1px solid rgba(255, 143, 196, .45); border-radius: 12px;
+  background: rgba(255,255,255,.85); color: var(--text); font: inherit; font-size: 14px;
+}
+[data-theme="dark"] .edit-box textarea { background: rgba(18,14,26,.7); }
+.edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.angle-select {
+  max-width: 128px; padding: 7px 8px; border-radius: 12px; font: inherit; font-size: 12px;
+  border: 1px solid rgba(185, 161, 255, .35); background: rgba(255,255,255,.75); color: var(--text);
+}
+[data-theme="dark"] .angle-select { background: rgba(18,14,26,.65); }
+@media (max-width: 640px) {
+  .row { flex-wrap: wrap; }
+}
+
+.onboarding[hidden] { display: none; }

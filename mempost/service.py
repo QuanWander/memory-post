@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import config as cfgmod
 from .comments import new_comments, normalize_post, reply_text, self_uin
-from .composer import LLM, compose
+from .composer import ANGLES, ANGLE_MAP, LLM, compose
 from .images import build_prompt, generate
 from .lint import Issue, lint
 from .privacy import PrivacyGuard
@@ -41,14 +41,31 @@ def _guard(cfg: dict) -> PrivacyGuard:
     return PrivacyGuard(privacy.get("entities") or [], privacy.get("deny_words") or [])
 
 
-def preview(config_path: str | Path, *, with_image: bool = False) -> dict:
+def has_material(memories, diary, guard: PrivacyGuard) -> bool:
+    usable = [m for m in memories if not guard.scan(m.text)]
+    return bool(usable) or bool(diary)
+
+
+def angles() -> list[dict]:
+    return [{"id": a["id"], "label": a["label"]} for a in ANGLES]
+
+
+def preview(
+    config_path: str | Path,
+    *,
+    with_image: bool = False,
+    angle_id: str | None = None,
+    save_draft: bool = True,
+) -> dict:
     cfg, path = _load(config_path)
     privacy = cfg.get("privacy") or {}
     memories = load_memories(cfgmod.resolve(cfg, "memory_file", path))
     diary = load_diary(cfgmod.resolve(cfg, "diary_dir", path), int(cfg.get("recent_days") or 3))
+    guard = _guard(cfg)
+    if bool(privacy.get("skip_if_no_material", True)) and not has_material(memories, diary, guard):
+        return {"ok": False, "skipped": True, "reason": "no_material", "text": "", "issues": [], "used": []}
     diary_text = diary_digest(diary)
     llm = LLM(cfg)
-    guard = _guard(cfg)
     auto_hints: list[str] = []
     if bool(privacy.get("auto_entities", True)):
         auto_hints = discover(
@@ -59,7 +76,17 @@ def preview(config_path: str | Path, *, with_image: bool = False) -> dict:
         )
     store = Store(path.parent / "state.json")
     variant = pick(cfg, len(store.posts()))
-    result = compose(cfg, _persona(cfg, path), variant, memories, diary_text, store.recent_texts(7, include_drafts=True), guard, llm=llm)
+    result = compose(
+        cfg,
+        _persona(cfg, path),
+        variant,
+        memories,
+        diary_text,
+        store.recent_texts(7, include_drafts=True),
+        guard,
+        llm=llm,
+        angle_id=angle_id,
+    )
     issues = lint(
         result.text,
         guard,
@@ -78,8 +105,16 @@ def preview(config_path: str | Path, *, with_image: bool = False) -> dict:
             image_path = generate(build_prompt("自拍或日常随手拍", describe(variant), scene=result.text), cfg, path.parent / "outbox" / "images")
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "text": result.text, "issues": issues + [f"image:{exc}"], "image": ""}
-    if issues:
-        store.add_draft(result.text, issues=[str(i) for i in issues], used=result.used_memories, variant=str(variant.get("name")), image=image_path)
+    if issues and save_draft:
+        store.add_draft(
+            result.text,
+            issues=[str(i) for i in issues],
+            used=result.used_memories,
+            variant=str(variant.get("name")),
+            image=image_path,
+            angle=result.angle_id,
+            angle_label=result.angle_label,
+        )
     return {
         "ok": not issues,
         "text": result.text,
@@ -87,6 +122,8 @@ def preview(config_path: str | Path, *, with_image: bool = False) -> dict:
         "image": image_path,
         "variant": variant.get("name"),
         "used": result.used_memories,
+        "angle": result.angle_id,
+        "angle_label": result.angle_label,
     }
 
 
@@ -172,6 +209,94 @@ def publish_draft(config_path: str | Path, draft_id: str) -> dict:
 def delete_post(config_path: str | Path, fid: str) -> dict:
     cfg, path = _load(config_path)
     return QzoneAPI(cfg).delete(fid)
+
+
+def update_draft(config_path: str | Path, draft_id: str, text: str) -> dict:
+    cfg, path = _load(config_path)
+    guard = _guard(cfg)
+    store = Store(path.parent / "state.json")
+    draft = store.get_draft(str(draft_id))
+    if not draft:
+        return {"ok": False, "issues": [f"找不到草稿 {draft_id}"]}
+    privacy = cfg.get("privacy") or {}
+    issues = lint(
+        str(text or ""),
+        guard,
+        min_chars=int(privacy.get("min_chars") or 18),
+        max_chars=int(privacy.get("max_chars") or 80),
+        recent=[],
+        similarity_threshold=float(privacy.get("similarity_threshold") or 0.55),
+    )
+    if issues:
+        return {"ok": False, "issues": [str(i) for i in issues]}
+    item = store.update_draft(str(draft_id), text=str(text or "").strip(), issues=[])
+    return {"ok": True, "draft": item}
+
+
+def regenerate_draft(config_path: str | Path, draft_id: str, angle_id: str | None = None) -> dict:
+    cfg, path = _load(config_path)
+    store = Store(path.parent / "state.json")
+    draft = store.get_draft(str(draft_id))
+    if not draft:
+        return {"ok": False, "issues": [f"找不到草稿 {draft_id}"]}
+    result = preview(config_path, angle_id=angle_id, save_draft=False)
+    if result.get("skipped") or not result.get("ok"):
+        return result
+    item = store.replace_draft(
+        str(draft_id),
+        result["text"],
+        used=result.get("used") or [],
+        angle=str(result.get("angle") or ""),
+        angle_label=str(result.get("angle_label") or ""),
+        issues=[],
+        image=str(draft.get("image") or ""),
+    )
+    return {"ok": True, "draft": item, "text": result["text"], "used": result.get("used") or [], "angle": result.get("angle")}
+
+
+def _detect_paths(config_path: Path) -> dict:
+    roots = [Path.cwd() / "data", config_path.parent / "data", config_path.parent]
+    detected = {"memory_file": "", "diary_dir": "", "persona_file": ""}
+    for root in roots:
+        memory = root / "plugin_data" / "astrbot_plugin_master_aware" / "memory.json"
+        if memory.exists() and not detected["memory_file"]:
+            detected["memory_file"] = str(memory)
+    for diary in (Path.cwd() / "大肥鱼日记", config_path.parent / "大肥鱼日记"):
+        if diary.exists():
+            if not detected["diary_dir"]:
+                detected["diary_dir"] = str(diary)
+            personas = sorted((diary / "小鲸鱼" / "人格").glob("*.md"))
+            if personas and not detected["persona_file"]:
+                detected["persona_file"] = str(personas[-1])
+            break
+    return detected
+
+
+def onboarding_status(config_path: str | Path) -> dict:
+    cfg, path = _load(config_path)
+    return {
+        "memory_file": cfgmod.resolve(cfg, "memory_file", path),
+        "diary_dir": cfgmod.resolve(cfg, "diary_dir", path),
+        "persona_file": cfgmod.resolve(cfg, "persona_file", path),
+        "detected": _detect_paths(path),
+    }
+
+
+def apply_onboarding(config_path: str | Path, payload: dict) -> dict:
+    cfg, path = _load(config_path)
+    updates = {}
+    for key in ("memory_file", "diary_dir", "persona_file"):
+        value = str((payload or {}).get(key) or "").strip()
+        if not value:
+            continue
+        if not Path(value).exists():
+            return {"ok": False, "error": f"{key} 不存在：{value}"}
+        updates[key] = value
+    if not updates:
+        return {"ok": False, "error": "没有可保存的路径"}
+    cfg.update(updates)
+    cfgmod.save(path, cfg)
+    return {"ok": True, "config": {k: cfg.get(k) for k in updates}}
 
 
 def doctor(config_path: str | Path) -> dict:

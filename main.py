@@ -24,7 +24,7 @@ from astrbot.api.web import error_response, file_response, json_response, reques
 
 from mempost import config as cfgmod
 from mempost.comments import new_comments, normalize_post, reply_text, self_uin
-from mempost.composer import LLM, compose
+from mempost.composer import ANGLES, LLM, compose
 from mempost.images import build_prompt, generate
 from mempost.lint import Issue, lint
 from mempost.privacy import PrivacyGuard
@@ -44,7 +44,7 @@ DEFAULT_PERSONA = "你是 DeepSeek 小鲸鱼，QQ 群里的群友。说话短、
     "astrbot_plugin_memory_post",
     "大肥鱼",
     "用她自己的记忆，每天写一条 QQ 空间说说",
-    "0.2.8",
+    "0.3.0",
 )
 class MemoryPost(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
@@ -59,6 +59,11 @@ class MemoryPost(Star):
         context.register_web_api("/astrbot_plugin_memory_post/drafts/image", self.page_image, ["GET"], "Draft image")
         context.register_web_api("/astrbot_plugin_memory_post/generate", self.page_generate, ["POST"], "Generate draft")
         context.register_web_api("/astrbot_plugin_memory_post/config", self.page_config, ["GET", "POST"], "Plugin settings")
+        context.register_web_api("/astrbot_plugin_memory_post/drafts/update", self.page_update_draft, ["POST"], "Update draft")
+        context.register_web_api("/astrbot_plugin_memory_post/drafts/regenerate", self.page_regenerate, ["POST"], "Regenerate draft")
+        context.register_web_api("/astrbot_plugin_memory_post/angles", self.page_angles, ["GET"], "Writing angles")
+        context.register_web_api("/astrbot_plugin_memory_post/onboarding/status", self.page_onboarding_status, ["GET"], "Onboarding status")
+        context.register_web_api("/astrbot_plugin_memory_post/onboarding/apply", self.page_onboarding_apply, ["POST"], "Apply onboarding")
 
     # ------------------------------------------------------------------ 页面 API
     async def page_drafts(self):
@@ -72,6 +77,9 @@ class MemoryPost(Star):
                     "created_at": x.get("created_at"),
                     "issues": x.get("issues") or [],
                     "image": bool(x.get("image")),
+                    "used": x.get("used") or [],
+                    "angle": x.get("angle") or "",
+                    "angle_label": x.get("angle_label") or "",
                 }
             )
         return json_response({"drafts": items, "adapter": str(self.config.get("publish_adapter") or "dry_run")})
@@ -89,6 +97,75 @@ class MemoryPost(Star):
         draft_id = str(payload.get("id") or "")
         store = Store(self._base / "state.json")
         return json_response({"deleted": store.remove_draft(draft_id)})
+
+    async def page_update_draft(self):
+        payload = await request.json(default={})
+        draft_id = str(payload.get("id") or "")
+        text = str(payload.get("text") or "").strip()
+        store = Store(self._base / "state.json")
+        if not store.get_draft(draft_id):
+            return error_response("找不到草稿", status_code=404)
+        cfg = self._core_config()
+        guard = PrivacyGuard(cfg["privacy"]["entities"], cfg["privacy"]["deny_words"])
+        issues = lint(
+            text,
+            guard,
+            min_chars=cfg["privacy"]["min_chars"],
+            max_chars=cfg["privacy"]["max_chars"],
+            recent=[],
+            similarity_threshold=cfg["privacy"]["similarity_threshold"],
+        )
+        if issues:
+            return json_response({"ok": False, "issues": [str(i) for i in issues]})
+        item = store.update_draft(draft_id, text=text, issues=[])
+        return json_response({"ok": True, "draft": item})
+
+    async def page_regenerate(self):
+        payload = await request.json(default={})
+        draft_id = str(payload.get("id") or "")
+        angle_id = str(payload.get("angle") or "") or None
+        store = Store(self._base / "state.json")
+        if not store.get_draft(draft_id):
+            return error_response("找不到草稿", status_code=404)
+        result = await asyncio.to_thread(self._generate_sync, angle_id, draft_id)
+        return json_response(result)
+
+    async def page_angles(self):
+        return json_response({"angles": [{"id": a["id"], "label": a["label"]} for a in ANGLES]})
+
+    async def page_onboarding_status(self):
+        memory = str(self.config.get("memory_file") or "")
+        detected = ""
+        sibling = self._base.parent / "astrbot_plugin_master_aware" / "memory.json"
+        if sibling.exists():
+            detected = str(sibling)
+        return json_response(
+            {
+                "memory_file": memory,
+                "diary_dir": str(self.config.get("diary_dir") or ""),
+                "persona_file": str(self.config.get("persona_file") or ""),
+                "detected": {"memory_file": detected, "diary_dir": "", "persona_file": ""},
+                "ready": bool(memory and self.config.get("diary_dir") and self.config.get("persona_file")),
+            }
+        )
+
+    async def page_onboarding_apply(self):
+        payload = await request.json(default={})
+        updates = {}
+        for key in ("memory_file", "diary_dir", "persona_file"):
+            value = str(payload.get(key) or "").strip()
+            if not value:
+                continue
+            if not Path(value).exists():
+                return error_response(f"{key} 不存在：{value}", status_code=400)
+            updates[key] = value
+        if not updates:
+            return error_response("没有可保存的路径", status_code=400)
+        self.config.update(updates)
+        save = getattr(self.config, "save_config", None)
+        if callable(save):
+            save()
+        return json_response({"ok": True, "config": {k: self.config.get(k) for k in updates}})
 
     async def page_image(self):
         draft_id = request.query.get("id", "")
@@ -184,7 +261,10 @@ class MemoryPost(Star):
         payload = await request.json(default={})
         if not isinstance(payload, dict):
             return error_response("bad payload", status_code=400)
-        updates = self._validate_settings(payload)
+        try:
+            updates = self._validate_settings(payload)
+        except ValueError as exc:
+            return error_response(str(exc), status_code=400)
         try:
             self.config.update(updates)
             save = getattr(self.config, "save_config", None)
@@ -233,11 +313,15 @@ class MemoryPost(Star):
         return cfg
 
     # ------------------------------------------------------------------ 生成
-    def _generate_sync(self) -> dict:
+    def _generate_sync(self, angle_id: str | None = None, draft_id: str | None = None) -> dict:
         cfg = self._core_config()
         guard = PrivacyGuard(cfg["privacy"]["entities"], cfg["privacy"]["deny_words"])
         memories = load_memories(cfg["memory_file"])
         diary = load_diary(cfg["diary_dir"], cfg["recent_days"])
+        if cfg["privacy"].get("skip_if_no_material", True):
+            usable = [m for m in memories if not guard.scan(m.text)]
+            if not usable and not diary:
+                return {"ok": False, "skipped": True, "reason": "no_material", "text": "", "issues": []}
         store = Store(self._base / "state.json")
         variant = pick(cfg, len(store.posts()))
         persona = DEFAULT_PERSONA
@@ -248,7 +332,17 @@ class MemoryPost(Star):
         auto_hints: list[str] = []
         if cfg["privacy"].get("auto_entities", True):
             auto_hints = discover(llm, [m.text for m in memories], diary_text, self._base / "state" / "privacy_entities.json")
-        result = compose(cfg, persona, variant, memories, diary_text, store.recent_texts(7, include_drafts=True), guard, llm=llm)
+        result = compose(
+            cfg,
+            persona,
+            variant,
+            memories,
+            diary_text,
+            store.recent_texts(7, include_drafts=True),
+            guard,
+            llm=llm,
+            angle_id=angle_id,
+        )
         issues = lint(
             result.text,
             guard,
@@ -269,13 +363,41 @@ class MemoryPost(Star):
                 logger.warning(f"[memory-post] 配图失败，按纯文字继续：{exc}")
 
         if issues:
-            store.add_draft(result.text, issues=[str(i) for i in issues], used=result.used_memories, variant=str(variant.get("name")), image=image_path)
-            return {"ok": False, "text": result.text, "issues": [str(i) for i in issues], "image": image_path}
+            if not draft_id:
+                store.add_draft(
+                    result.text,
+                    issues=[str(i) for i in issues],
+                    used=result.used_memories,
+                    variant=str(variant.get("name")),
+                    image=image_path,
+                    angle=result.angle_id,
+                    angle_label=result.angle_label,
+                )
+            return {"ok": False, "text": result.text, "issues": [str(i) for i in issues], "image": image_path, "angle": result.angle_id}
+
+        if draft_id:
+            item = store.replace_draft(
+                str(draft_id),
+                result.text,
+                used=result.used_memories,
+                angle=result.angle_id,
+                angle_label=result.angle_label,
+                issues=[],
+                image=image_path,
+            )
+            return {"ok": True, "published": False, "text": result.text, "image": image_path, "draft": item, "angle": result.angle_id}
 
         mode = str(cfg.get("mode") or "draft")
         if mode != "publish":
-            store.add_draft(result.text, used=result.used_memories, variant=str(variant.get("name")), image=image_path)
-            return {"ok": True, "published": False, "text": result.text, "image": image_path}
+            store.add_draft(
+                result.text,
+                used=result.used_memories,
+                variant=str(variant.get("name")),
+                image=image_path,
+                angle=result.angle_id,
+                angle_label=result.angle_label,
+            )
+            return {"ok": True, "published": False, "text": result.text, "image": image_path, "angle": result.angle_id}
 
         adapter = str(cfg["publish"]["adapter"] or "dry_run")
         try:
@@ -284,11 +406,19 @@ class MemoryPost(Star):
             else:
                 payload = dry_run.publish(result.text, outbox=str(self._base / "outbox"))
         except (QzoneError, QzoneNativeError, RuntimeError) as exc:
-            store.add_draft(result.text, issues=[f"publish_failed:{exc}"], used=result.used_memories, variant=str(variant.get("name")), image=image_path)
-            return {"ok": False, "text": result.text, "issues": [f"publish_failed:{exc}"], "image": image_path}
+            store.add_draft(
+                result.text,
+                issues=[f"publish_failed:{exc}"],
+                used=result.used_memories,
+                variant=str(variant.get("name")),
+                image=image_path,
+                angle=result.angle_id,
+                angle_label=result.angle_label,
+            )
+            return {"ok": False, "text": result.text, "issues": [f"publish_failed:{exc}"], "image": image_path, "angle": result.angle_id}
 
         store.add_post(result.text, fid=str(payload.get("fid") or ""), used=result.used_memories, variant=str(variant.get("name")), image=image_path)
-        return {"ok": True, "published": True, "text": result.text, "image": image_path, "payload": payload}
+        return {"ok": True, "published": True, "text": result.text, "image": image_path, "payload": payload, "angle": result.angle_id}
 
     # ------------------------------------------------------------------ 评论
     def _comments_sync(self, send: bool = False) -> dict:

@@ -40,8 +40,11 @@ const settingsEl = document.getElementById("settings");
 const settingsForm = document.getElementById("settingsForm");
 const settingsClose = document.getElementById("settingsClose");
 const settingsCancel = document.getElementById("settingsCancel");
+const onboardingBanner = document.getElementById("onboardingBanner");
+const onboardBtn = document.getElementById("onboardBtn");
 
 let toastTimer = null;
+let angleOptions = [];
 
 function esc(text) {
   return String(text ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -115,7 +118,8 @@ function render(drafts) {
 
     const meta = document.createElement("div");
     meta.className = "meta";
-    meta.innerHTML = `<span>${esc(draft.created_at || "")}</span><span>#${esc(draft.id)}</span>`;
+    const angleLabel = draft.angle_label || draft.angle || "随机";
+    meta.innerHTML = `<span>${esc(draft.created_at || "")}</span><span>#${esc(draft.id)} · ${esc(angleLabel)}</span>`;
 
     const text = document.createElement("div");
     text.className = "text";
@@ -133,6 +137,22 @@ function render(drafts) {
         issues.appendChild(tag);
       }
       card.appendChild(issues);
+    }
+
+    if (draft.used && draft.used.length) {
+      const details = document.createElement("details");
+      details.className = "memories";
+      const summary = document.createElement("summary");
+      summary.textContent = `用了 ${draft.used.length} 条记忆`;
+      details.appendChild(summary);
+      const list = document.createElement("ul");
+      for (const item of draft.used) {
+        const li = document.createElement("li");
+        li.textContent = item;
+        list.appendChild(li);
+      }
+      details.appendChild(list);
+      card.appendChild(details);
     }
 
     const row = document.createElement("div");
@@ -160,6 +180,65 @@ function render(drafts) {
       }
     });
 
+    const editBtn = button("编辑", "btn ghost", () => {
+      if (card.querySelector(".edit-box")) return;
+      const box = document.createElement("div");
+      box.className = "edit-box";
+      const area = document.createElement("textarea");
+      area.value = draft.text || "";
+      area.rows = 3;
+      const save = button("保存", "btn primary", async () => {
+        save.disabled = true;
+        try {
+          const result = await bridge.apiPost("drafts/update", { id: draft.id, text: area.value });
+          if (result && result.ok) {
+            toast("已保存");
+            await load();
+          } else {
+            toast("没保存：" + ((result && result.issues) || []).join("；"), true);
+            save.disabled = false;
+          }
+        } catch (error) {
+          toast("保存失败：" + error.message, true);
+          save.disabled = false;
+        }
+      });
+      const cancel = button("取消", "btn ghost", () => box.remove());
+      const actions = document.createElement("div");
+      actions.className = "edit-actions";
+      actions.append(save, cancel);
+      box.append(area, actions);
+      card.appendChild(box);
+    });
+
+    const angleSelect = document.createElement("select");
+    angleSelect.className = "angle-select";
+    angleSelect.innerHTML = '<option value="">随机写法</option>' + angleOptions
+      .map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`)
+      .join("");
+    if (draft.angle) angleSelect.value = draft.angle;
+
+    const rewriteBtn = button("换个写法", "btn ghost", async () => {
+      rewriteBtn.disabled = true;
+      rewriteBtn.textContent = "重写中…";
+      try {
+        const result = await bridge.apiPost("drafts/regenerate", { id: draft.id, angle: angleSelect.value });
+        if (result && result.ok) {
+          toast("换了个写法");
+          await load();
+        } else if (result && result.skipped) {
+          toast("今天没素材，先不硬写", true);
+        } else {
+          toast("没重写：" + ((result && result.issues) || []).join("；"), true);
+        }
+      } catch (error) {
+        toast("重写失败：" + error.message, true);
+      } finally {
+        rewriteBtn.disabled = false;
+        rewriteBtn.textContent = "换个写法";
+      }
+    });
+
     const copyBtn = button("复制", "btn ghost", async () => {
       try {
         await navigator.clipboard.writeText(draft.text || "");
@@ -183,7 +262,7 @@ function render(drafts) {
       }
     });
 
-    row.append(publishBtn, copyBtn, deleteBtn);
+    row.append(publishBtn, editBtn, angleSelect, rewriteBtn, copyBtn, deleteBtn);
     card.appendChild(row);
 
     if (draft.image) {
@@ -264,6 +343,7 @@ async function saveSettings(event) {
 
 if (!hadPluginBridge) {
   settingsBtn.hidden = true;
+  onboardingBanner.hidden = true;
 } else {
   settingsBtn.addEventListener("click", openSettings);
   settingsClose.addEventListener("click", closeSettings);
@@ -272,6 +352,26 @@ if (!hadPluginBridge) {
     mask.addEventListener("click", closeSettings);
   }
   settingsForm.addEventListener("submit", saveSettings);
+  onboardBtn.addEventListener("click", openSettings);
+}
+
+async function loadAngles() {
+  try {
+    const data = await bridge.apiGet("angles");
+    angleOptions = data.angles || [];
+  } catch {
+    angleOptions = [];
+  }
+}
+
+async function checkOnboarding() {
+  if (!hadPluginBridge) return;
+  try {
+    const data = await bridge.apiGet("onboarding/status");
+    onboardingBanner.hidden = Boolean(data.ready);
+  } catch {
+    onboardingBanner.hidden = true;
+  }
 }
 
 refreshBtn.addEventListener("click", load);
@@ -282,7 +382,11 @@ generateBtn.addEventListener("click", async () => {
   label.textContent = "生成中…";
   try {
     const result = await bridge.apiPost("generate", {});
-    toast(result && result.ok ? "已生成草稿" : "生成失败：" + ((result && result.issues) || []).join("；"), !(result && result.ok));
+    if (result && result.skipped) {
+      toast("今天没素材，先不硬写");
+    } else {
+      toast(result && result.ok ? "已生成草稿" : "生成失败：" + ((result && result.issues) || []).join("；"), !(result && result.ok));
+    }
     await load();
   } catch (error) {
     toast("生成失败：" + error.message, true);
@@ -293,4 +397,6 @@ generateBtn.addEventListener("click", async () => {
 });
 
 await bridge.ready();
+await loadAngles();
+await checkOnboarding();
 await load();

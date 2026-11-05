@@ -47,7 +47,7 @@ class Store:
         self._save(data)
         return item
 
-    def add_draft(self, text: str, *, issues: list[str] | None = None, used: list[str] | None = None, variant: str = "", image: str = "") -> dict:
+    def add_draft(self, text: str, *, issues: list[str] | None = None, used: list[str] | None = None, variant: str = "", image: str = "", angle: str = "", angle_label: str = "") -> dict:
         data = self._load()
         item = {
             "id": uuid.uuid4().hex[:8],
@@ -56,11 +56,34 @@ class Store:
             "used": used or [],
             "variant": variant,
             "image": image,
+            "angle": angle,
+            "angle_label": angle_label,
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         data["drafts"].append(item)
         self._save(data)
         return item
+
+    def update_draft(self, draft_id: str, **fields) -> dict | None:
+        data = self._load()
+        for item in data.get("drafts") or []:
+            if str(item.get("id")) == str(draft_id):
+                item.update({k: v for k, v in fields.items() if v is not None})
+                item["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                self._save(data)
+                return item
+        return None
+
+    def replace_draft(self, draft_id: str, text: str, *, used: list[str] | None = None, angle: str = "", angle_label: str = "", issues: list[str] | None = None, image: str = "") -> dict | None:
+        return self.update_draft(
+            draft_id,
+            text=text,
+            used=used or [],
+            angle=angle,
+            angle_label=angle_label,
+            issues=issues or [],
+            image=image,
+        )
 
     def get_draft(self, draft_id: str) -> dict | None:
         for item in self._load().get("drafts") or []:

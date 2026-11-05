@@ -72,6 +72,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/v1/drafts":
             _send(self, {"drafts": service.drafts(CONFIG), "adapter": service.doctor(CONFIG).get("adapter")})
             return
+        if path == "/v1/angles":
+            _send(self, {"angles": service.angles()})
+            return
+        if path == "/v1/onboarding/status":
+            _send(self, service.onboarding_status(CONFIG))
+            return
         if path == "/v1/drafts/image":
             draft_id = (parse_qs(parsed.query).get("id") or [""])[0]
             draft = _store().get_draft(draft_id)
@@ -120,6 +126,12 @@ class Handler(BaseHTTPRequestHandler):
                 data = service.publish_draft(CONFIG, str(body.get("id") or ""))
             elif path == "/v1/drafts/delete":
                 data = {"deleted": _store().remove_draft(str(body.get("id") or ""))}
+            elif path == "/v1/drafts/update":
+                data = service.update_draft(CONFIG, str(body.get("id") or ""), str(body.get("text") or ""))
+            elif path == "/v1/drafts/regenerate":
+                data = service.regenerate_draft(CONFIG, str(body.get("id") or ""), str(body.get("angle") or "") or None)
+            elif path == "/v1/onboarding/apply":
+                data = service.apply_onboarding(CONFIG, body)
             elif path == "/v1/comments":
                 data = {"comments": service.comments(CONFIG, send=bool(body.get("send")))}
             else:
