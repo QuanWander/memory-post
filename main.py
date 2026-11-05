@@ -9,7 +9,9 @@ from __future__ import annotations
 import asyncio
 import copy
 import os
+import re
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -42,7 +44,7 @@ DEFAULT_PERSONA = "你是 DeepSeek 小鲸鱼，QQ 群里的群友。说话短、
     "astrbot_plugin_memory_post",
     "大肥鱼",
     "用她自己的记忆，每天写一条 QQ 空间说说",
-    "0.2.6",
+    "0.2.7",
 )
 class MemoryPost(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
@@ -326,6 +328,8 @@ class MemoryPost(Star):
         cfg = self._core_config()
         api = QzoneAPI(cfg)
         store = Store(self._base / "state.json")
+        if store.baseline_done():
+            return {"baseline": "done"}
         seen = store.seen_ids()
         pending: list[str] = []
         for post in [normalize_post(x) for x in api.feeds(5)]:
@@ -341,6 +345,7 @@ class MemoryPost(Star):
                     pending.append(key)
                     seen.add(key)
         store.mark_seen_many(pending)
+        store.mark_baseline_done()
         return {"baseline": len(pending)}
 
     def _watch_once(self) -> dict:

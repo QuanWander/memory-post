@@ -77,6 +77,14 @@ class Store:
         self._save(data)
         return True
 
+    def baseline_done(self) -> bool:
+        return bool(self._load().get("watch_baseline_at"))
+
+    def mark_baseline_done(self) -> None:
+        data = self._load()
+        data["watch_baseline_at"] = time.time()
+        self._save(data)
+
     def seen_ids(self) -> set[str]:
         data = self._load()
         return set(data.get("seen") or [])
