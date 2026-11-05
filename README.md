@@ -4,7 +4,7 @@
 
 给 AI 角色用的 QQ 空间说说生成器：读记忆和日记 → 用她的人格写 → 过隐私 → 草稿或自动发 → 还能回评论。
 
-![version](https://img.shields.io/badge/version-0.2.4-blue)
+![version](https://img.shields.io/badge/version-0.2.5-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![tests](https://img.shields.io/badge/tests-52%20passed-brightgreen)
@@ -52,7 +52,7 @@ memory-post 反过来：**先看她知道什么，再决定发什么。**
 
 ```bash
 # 1. 装
-pip install memory_post-0.2.4-py3-none-any.whl
+pip install memory_post-0.2.5-py3-none-any.whl
 
 # 2. 生成配置（AstrBot 用户可加 --preset astrbot 自动猜路径）
 mem-post init --config config.json --preset astrbot
@@ -104,6 +104,7 @@ mem-post publish --config config.json
 | `recent_days` | 读最近几天日记 |
 | `schedule.time` | 每天几点跑，默认 `21:30` |
 | `self_image.variants` | 她在社区里的形象，可多个，按天轮换 |
+| `llm.model` | `flash` 或 `pro`，自动解析当前最新版本 |
 | `llm.*` | OpenAI 兼容接口（DeepSeek / 豆包 / 千问都行） |
 | `publish.adapter` | `dry_run` / `qzone_daemon` |
 | `publish.qzone_state_file` | qzone_ultra 的 `state.json`，读 daemon 端口和 secret |

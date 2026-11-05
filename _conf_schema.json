@@ -104,9 +104,21 @@
     "secret": true
   },
   "llm_model": {
-    "description": "模型名",
+    "description": "写说说用哪个模型",
     "type": "string",
-    "default": "deepseek-flash"
+    "default": "flash",
+    "options": [
+      "flash",
+      "pro"
+    ],
+    "labels": [
+      "Flash（快、便宜）",
+      "Pro（文采更好）"
+    ],
+    "subtitles": [
+      "日常够用，速度快",
+      "句子更稳，单条略贵"
+    ]
   },
   "privacy_entities": {
     "description": "不能出现的实体（逗号分隔）",

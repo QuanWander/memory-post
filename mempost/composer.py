@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import random
 import re
+import time
 import urllib.request
 from dataclasses import dataclass
 
@@ -23,12 +24,65 @@ class LLMError(RuntimeError):
     pass
 
 
+_MODEL_CACHE: dict[str, tuple[float, str]] = {}
+
+
+def _version_key(text: str) -> tuple[int, ...]:
+    nums = re.findall(r"\d+(?:\.\d+)?", text or "")
+    return tuple(int(float(n)) for n in nums) if nums else (0,)
+
+
+def choose_latest_model(models: list[dict], family: str) -> str:
+    """从 /models 里挑该系列最新的模型 id；有别名优先用别名。"""
+    family = family.lower()
+    rows = [m for m in models if isinstance(m, dict) and family in str(m.get("id", "")).lower()]
+    rows = [m for m in rows if not any(x in str(m.get("id", "")).lower() for x in ("embedding", "rerank"))]
+    if not rows:
+        return ""
+    alias = f"deepseek-{family}"
+    for m in rows:
+        if str(m.get("id", "")).lower() == alias:
+            return alias
+    rows.sort(key=lambda m: _version_key(f"{m.get('id','')} {m.get('name','')}"), reverse=True)
+    return str(rows[0].get("id") or "")
+
+
+def resolve_model(base_url: str, api_key: str, model: str, timeout: float = 10) -> str:
+    """把 flash / pro 解析成当前最新模型；解析不了就用原名。"""
+    family = ""
+    low = (model or "").lower()
+    if "flash" in low:
+        family = "flash"
+    elif "pro" in low:
+        family = "pro"
+    if not family or "deepseek" not in (base_url or "").lower():
+        return model
+    cache_key = f"{base_url}|{family}"
+    cached = _MODEL_CACHE.get(cache_key)
+    if cached and time.time() - cached[0] < 3600:
+        return cached[1]
+    try:
+        req = urllib.request.Request(
+            base_url.rstrip("/") + "/models",
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        chosen = choose_latest_model(data.get("data") or [], family)
+    except Exception:  # noqa: BLE001
+        chosen = ""
+    if not chosen:
+        chosen = "deepseek-flash" if family == "flash" else "deepseek-v4-pro"
+    _MODEL_CACHE[cache_key] = (time.time(), chosen)
+    return chosen
+
+
 class LLM:
     def __init__(self, cfg: dict):
         llm = cfg.get("llm") or {}
         self.base_url = str(llm.get("base_url") or "").rstrip("/")
         self.api_key = str(llm.get("api_key") or "")
-        self.model = str(llm.get("model") or "deepseek-flash")
+        self.model = resolve_model(self.base_url, self.api_key, str(llm.get("model") or "flash"))
         self.temperature = float(llm.get("temperature") or 1.0)
         self.frequency_penalty = float(llm.get("frequency_penalty") if llm.get("frequency_penalty") is not None else 0.2)
         self.max_tokens = int(llm.get("max_tokens") or 400)

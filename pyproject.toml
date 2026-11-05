@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memory-post"
-version = "0.2.4"
+version = "0.2.5"
 description = "用 AI 自己的记忆，每天写一条 QQ 空间说说（可选配图、评论回复），跨平台、可隐私过滤"
 readme = "README.md"
 requires-python = ">=3.10"

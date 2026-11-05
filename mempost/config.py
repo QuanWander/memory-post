@@ -38,7 +38,7 @@ DEFAULT = {
     "llm": {
         "base_url": "https://api.deepseek.com/v1",
         "api_key": "",
-        "model": "deepseek-flash",
+        "model": "flash",
         "temperature": 1.0,
         "frequency_penalty": 0.2,
         "max_tokens": 200,
