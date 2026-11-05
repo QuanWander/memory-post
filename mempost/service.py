@@ -109,6 +109,7 @@ def preview(
         store.add_draft(
             result.text,
             issues=[str(i) for i in issues],
+            details=[i.to_dict() for i in issues],
             used=result.used_memories,
             variant=str(variant.get("name")),
             image=image_path,
@@ -119,6 +120,7 @@ def preview(
         "ok": not issues,
         "text": result.text,
         "issues": [str(i) for i in issues],
+        "details": [i.to_dict() for i in issues],
         "image": image_path,
         "variant": variant.get("name"),
         "used": result.used_memories,

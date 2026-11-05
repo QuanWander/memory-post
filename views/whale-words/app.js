@@ -40,6 +40,8 @@ const settingsEl = document.getElementById("settings");
 const settingsForm = document.getElementById("settingsForm");
 const settingsClose = document.getElementById("settingsClose");
 const settingsCancel = document.getElementById("settingsCancel");
+const variantList = document.getElementById("variantList");
+const variantAdd = document.getElementById("variantAdd");
 const onboardingBanner = document.getElementById("onboardingBanner");
 const onboardBtn = document.getElementById("onboardBtn");
 
@@ -127,7 +129,7 @@ function render(drafts) {
 
     card.append(tape, tag, meta, text);
 
-    if (draft.issues && draft.issues.length) {
+    if (draft.issues && draft.issues.length && !(draft.details && draft.details.length)) {
       const issues = document.createElement("div");
       issues.className = "issues";
       for (const issue of draft.issues) {
@@ -137,6 +139,34 @@ function render(drafts) {
         issues.appendChild(tag);
       }
       card.appendChild(issues);
+    }
+
+    if (draft.details && draft.details.length) {
+      const report = document.createElement("details");
+      report.className = "privacy-report";
+      const summary = document.createElement("summary");
+      summary.textContent = `隐私报告 · ${draft.details.length} 条`;
+      report.appendChild(summary);
+      if (draft.issues && draft.issues.length) report.open = true;
+      const list = document.createElement("ul");
+      const labels = {
+        entity: "实体命中",
+        regex: "号码/邮箱",
+        deny: "禁用词",
+        llm: "模型判断",
+        length: "长度",
+        similarity: "重复",
+        tone: "AI 腔",
+        publish: "发布",
+        text: "文本",
+      };
+      for (const item of draft.details) {
+        const li = document.createElement("li");
+        li.textContent = `${labels[item.source] || item.source || "检查"}：${item.detail}`;
+        list.appendChild(li);
+      }
+      report.appendChild(list);
+      card.appendChild(report);
     }
 
     if (draft.used && draft.used.length) {
@@ -280,6 +310,43 @@ function render(drafts) {
   }
 }
 
+function addVariantCard(variant = {}) {
+  const card = document.createElement("div");
+  card.className = "variant-card";
+  const name = document.createElement("input");
+  name.className = "variant-name";
+  name.type = "text";
+  name.placeholder = "形象名，例如 小鲸鱼";
+  name.value = variant.name || "";
+  const desc = document.createElement("textarea");
+  desc.className = "variant-desc";
+  desc.rows = 2;
+  desc.placeholder = "外形、气质、说话方式";
+  desc.value = variant.desc || "";
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "variant-remove";
+  remove.textContent = "删除";
+  remove.addEventListener("click", () => card.remove());
+  card.append(name, desc, remove);
+  variantList.appendChild(card);
+}
+
+function renderVariants(list) {
+  variantList.innerHTML = "";
+  for (const item of list || []) addVariantCard(item);
+}
+
+function readVariants() {
+  const out = [];
+  for (const card of variantList.querySelectorAll(".variant-card")) {
+    const name = card.querySelector(".variant-name").value.trim();
+    const desc = card.querySelector(".variant-desc").value.trim();
+    if (name && desc) out.push({ name, desc });
+  }
+  return out;
+}
+
 function fillSettings(cfg) {
   for (const el of settingsForm.querySelectorAll("[data-key]")) {
     const key = el.dataset.key;
@@ -287,6 +354,7 @@ function fillSettings(cfg) {
       el.value = "";
       continue;
     }
+    if (key === "self_image_variants") continue;
     const value = cfg[key];
     if (el.type === "checkbox") {
       el.checked = Boolean(value);
@@ -294,6 +362,7 @@ function fillSettings(cfg) {
       el.value = value ?? "";
     }
   }
+  renderVariants(cfg.self_image_variants || []);
 }
 
 async function openSettings() {
@@ -312,10 +381,11 @@ function closeSettings() {
 
 async function saveSettings(event) {
   event.preventDefault();
-  const payload = {};
+  const payload = { self_image_variants: readVariants() };
   for (const el of settingsForm.querySelectorAll("[data-key]")) {
     const key = el.dataset.key;
     if (key === "images_api_key" && !el.value.trim()) continue;
+    if (key === "self_image_variants") continue;
     if (el.type === "checkbox") {
       payload[key] = el.checked;
     } else if (el.type === "number") {
@@ -352,6 +422,7 @@ if (!hadPluginBridge) {
     mask.addEventListener("click", closeSettings);
   }
   settingsForm.addEventListener("submit", saveSettings);
+  variantAdd.addEventListener("click", () => addVariantCard());
   onboardBtn.addEventListener("click", openSettings);
 }
 

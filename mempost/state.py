@@ -47,12 +47,13 @@ class Store:
         self._save(data)
         return item
 
-    def add_draft(self, text: str, *, issues: list[str] | None = None, used: list[str] | None = None, variant: str = "", image: str = "", angle: str = "", angle_label: str = "") -> dict:
+    def add_draft(self, text: str, *, issues: list[str] | None = None, details: list[dict] | None = None, used: list[str] | None = None, variant: str = "", image: str = "", angle: str = "", angle_label: str = "") -> dict:
         data = self._load()
         item = {
             "id": uuid.uuid4().hex[:8],
             "text": text,
             "issues": issues or [],
+            "details": details or [],
             "used": used or [],
             "variant": variant,
             "image": image,
@@ -74,7 +75,7 @@ class Store:
                 return item
         return None
 
-    def replace_draft(self, draft_id: str, text: str, *, used: list[str] | None = None, angle: str = "", angle_label: str = "", issues: list[str] | None = None, image: str = "") -> dict | None:
+    def replace_draft(self, draft_id: str, text: str, *, used: list[str] | None = None, angle: str = "", angle_label: str = "", issues: list[str] | None = None, details: list[dict] | None = None, image: str = "") -> dict | None:
         return self.update_draft(
             draft_id,
             text=text,
@@ -82,6 +83,7 @@ class Store:
             angle=angle,
             angle_label=angle_label,
             issues=issues or [],
+            details=details or [],
             image=image,
         )
 

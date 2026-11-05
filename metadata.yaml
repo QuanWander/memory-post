@@ -5,7 +5,7 @@ desc: >-
   大肥鱼出品。从记忆与日记里挑素材，用她的人格写一条说说，发布前先过隐私过滤和文本检查。
   默认草稿模式，可切自动；发布走 qzone_ultra 的本地 daemon，也可以只写 outbox。
   核心与平台无关，CLI / MCP 也能单独跑。
-version: 0.3.1
+version: 0.4.0
 author: 大肥鱼
 repo: https://github.com/QuanWander/memory-post
 astrbot_version: ">=4.17.0"

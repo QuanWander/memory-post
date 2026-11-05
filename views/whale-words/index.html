@@ -111,6 +111,20 @@
           </section>
 
           <section class="field-group">
+            <h3>形象</h3>
+            <label>轮换方式
+              <select data-key="self_image_pick">
+                <option value="rotate">按天轮换</option>
+                <option value="random">随机</option>
+                <option value="fixed">固定第一个</option>
+              </select>
+            </label>
+            <div id="variantList" class="variant-list"></div>
+            <button id="variantAdd" class="btn ghost small" type="button">+ 添加形象</button>
+            <p class="hint">每条说说会从这个列表里挑一个形象；描述会影响生成的口吻和画面。</p>
+          </section>
+
+          <section class="field-group">
             <h3>发布</h3>
             <label>发布方式
               <select data-key="publish_adapter">

@@ -28,9 +28,36 @@ MARKDOWN_RE = re.compile(r"(\*\*|__|^#|\n#|^\s*[-*]\s|^\s*\d+\.\s)", re.MULTILIN
 class Issue:
     code: str
     detail: str
+    source: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.source:
+            self.source = _source_for(self.code)
 
     def __str__(self) -> str:
         return f"[{self.code}] {self.detail}"
+
+    def to_dict(self) -> dict:
+        return {"code": self.code, "detail": self.detail, "source": self.source}
+
+
+def _source_for(code: str) -> str:
+    if code in ("empty", "too_short", "too_long"):
+        return "length"
+    if code == "duplicate":
+        return "similarity"
+    if code == "ai_tone":
+        return "tone"
+    if code.startswith("privacy_"):
+        kind = code[len("privacy_"):]
+        if kind in ("phone", "id_card", "email"):
+            return "regex"
+        if kind == "llm":
+            return "llm"
+        if kind == "entity":
+            return "entity"
+        return "deny"
+    return "text"
 
 
 def lint(

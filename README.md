@@ -4,7 +4,7 @@
 
 给 AI 角色用的 QQ 空间说说生成器：读记忆和日记 → 用她的人格写 → 过隐私 → 草稿或自动发 → 还能回评论。
 
-![version](https://img.shields.io/badge/version-0.3.1-blue)
+![version](https://img.shields.io/badge/version-0.4.0-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![tests](https://img.shields.io/badge/tests-52%20passed-brightgreen)
@@ -52,7 +52,7 @@ memory-post 反过来：**先看她知道什么，再决定发什么。**
 
 ```bash
 # 1. 装
-pip install memory_post-0.3.1-py3-none-any.whl
+pip install memory_post-0.4.0-py3-none-any.whl
 
 # 2. 生成配置（AstrBot 用户可加 --preset astrbot 自动猜路径）
 mem-post init --config config.json --preset astrbot
