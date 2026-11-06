@@ -25,6 +25,7 @@ from astrbot.api.web import error_response, file_response, json_response, reques
 from mempost import config as cfgmod
 from mempost.comments import new_comments, normalize_post, reply_text, self_uin
 from mempost.composer import ANGLES, LLM, compose
+from mempost.demo import examples as demo_examples
 from mempost.images import build_prompt, generate
 from mempost.lint import Issue, lint
 from mempost.privacy import PrivacyGuard
@@ -44,7 +45,7 @@ DEFAULT_PERSONA = "你是 DeepSeek 小鲸鱼，QQ 群里的群友。说话短、
     "astrbot_plugin_memory_post",
     "大肥鱼",
     "用她自己的记忆，每天写一条 QQ 空间说说",
-    "0.4.0",
+    "0.5.0",
 )
 class MemoryPost(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
@@ -64,6 +65,8 @@ class MemoryPost(Star):
         context.register_web_api("/astrbot_plugin_memory_post/angles", self.page_angles, ["GET"], "Writing angles")
         context.register_web_api("/astrbot_plugin_memory_post/onboarding/status", self.page_onboarding_status, ["GET"], "Onboarding status")
         context.register_web_api("/astrbot_plugin_memory_post/onboarding/apply", self.page_onboarding_apply, ["POST"], "Apply onboarding")
+        context.register_web_api("/astrbot_plugin_memory_post/demo", self.page_demo, ["GET"], "Demo examples")
+        context.register_web_api("/astrbot_plugin_memory_post/doctor", self.page_doctor, ["GET"], "Config doctor")
 
     # ------------------------------------------------------------------ 页面 API
     async def page_drafts(self):
@@ -136,17 +139,31 @@ class MemoryPost(Star):
 
     async def page_onboarding_status(self):
         memory = str(self.config.get("memory_file") or "")
-        detected = ""
+        diary = str(self.config.get("diary_dir") or "")
+        persona = str(self.config.get("persona_file") or "")
+        memories = []
         sibling = self._base.parent / "astrbot_plugin_master_aware" / "memory.json"
-        if sibling.exists():
-            detected = str(sibling)
+        for path in (memory, str(sibling)):
+            if path and Path(path).is_file() and path not in memories:
+                memories.append(path)
+        personas = []
+        if diary and Path(diary).is_dir():
+            for path in sorted((Path(diary) / "小鲸鱼" / "人格").glob("*.md")):
+                personas.append(str(path))
+        if persona and persona not in personas:
+            personas.insert(0, persona)
         return json_response(
             {
                 "memory_file": memory,
-                "diary_dir": str(self.config.get("diary_dir") or ""),
-                "persona_file": str(self.config.get("persona_file") or ""),
-                "detected": {"memory_file": detected, "diary_dir": "", "persona_file": ""},
-                "ready": bool(memory and self.config.get("diary_dir") and self.config.get("persona_file")),
+                "diary_dir": diary,
+                "persona_file": persona,
+                "detected": {
+                    "memory_file": memories[0] if memories else "",
+                    "diary_dir": diary,
+                    "persona_file": personas[0] if personas else "",
+                },
+                "candidates": {"memory_file": memories, "diary_dir": [diary] if diary else [], "persona_file": personas},
+                "ready": bool(memory and diary and persona),
             }
         )
 
@@ -167,6 +184,59 @@ class MemoryPost(Star):
         if callable(save):
             save()
         return json_response({"ok": True, "config": {k: self.config.get(k) for k in updates}})
+
+    async def page_demo(self):
+        return json_response({"examples": demo_examples()})
+
+    async def page_doctor(self):
+        cfg = self._core_config()
+        items = []
+
+        def add(key, label, status, detail, action=""):
+            items.append({"key": key, "label": label, "status": status, "detail": detail, "action": action})
+
+        memory = str(cfg.get("memory_file") or "")
+        if not memory or not Path(memory).is_file():
+            add("memory", "记忆文件", "red", "没找到记忆文件", "auto")
+        else:
+            try:
+                count = len(load_memories(memory))
+                add("memory", "记忆文件", "green" if count else "yellow", f"{count} 条记忆")
+            except Exception as exc:  # noqa: BLE001
+                add("memory", "记忆文件", "red", f"读不了：{exc}", "auto")
+
+        diary = str(cfg.get("diary_dir") or "")
+        if not diary or not Path(diary).is_dir():
+            add("diary", "日记目录", "red", "没找到日记目录", "auto")
+        else:
+            count = len(list(Path(diary).glob("*.md")))
+            add("diary", "日记目录", "green" if count else "yellow", f"{count} 篇日记")
+
+        persona = str(cfg.get("persona_file") or "")
+        if not persona or not Path(persona).is_file():
+            add("persona", "人格文件", "red", "没找到人格文件", "auto")
+        else:
+            add("persona", "人格文件", "green", f"{len(Path(persona).read_text(encoding='utf-8'))} 字")
+
+        key = str(cfg["llm"].get("api_key") or "")
+        add("llm", "模型", "green" if key else "red", "已配置" if key else "没填 API Key", "" if key else "settings")
+
+        adapter = str(cfg["publish"].get("adapter") or "dry_run")
+        add("adapter", "发布方式", "green", adapter)
+
+        try:
+            probe = self._base / ".doctor-probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink()
+            add("state", "数据目录", "green", "可写")
+        except Exception as exc:  # noqa: BLE001
+            add("state", "数据目录", "red", f"不可写：{exc}")
+
+        last = Store(self._base / "state.json").drafts()
+        if last and last[-1].get("issues"):
+            add("last", "上次失败", "yellow", self._human_error(str(last[-1]["issues"][0])), "drafts")
+
+        return json_response({"items": items, "ok": not any(x["status"] == "red" for x in items)})
 
     async def page_image(self):
         draft_id = request.query.get("id", "")
@@ -315,6 +385,18 @@ class MemoryPost(Star):
         return json_response({"ok": True, "config": self._public_settings()})
 
     # ------------------------------------------------------------------ 配置
+    def _human_error(self, text: str) -> str:
+        body = str(text or "")
+        if "QzoneNeedsRebind" in body or "cookie" in body.lower():
+            return "QQ 空间登录失效，需要重新绑定"
+        if "invalid" in body.lower() or "api key" in body.lower():
+            return "模型 Key 可能不对，去设置里换一个"
+        if "not found" in body.lower() or "No such file" in body:
+            return "文件没找到，点「自动找」"
+        if "Permission" in body:
+            return "文件没权限，换个目录"
+        return body[:120]
+
     def _split(self, key: str, default: str = "") -> list[str]:
         raw = str(self.config.get(key) or default)
         return [x.strip() for x in raw.replace("，", ",").split(",") if x.strip()]

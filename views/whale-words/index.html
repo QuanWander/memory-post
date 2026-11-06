@@ -47,6 +47,9 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg>
           <span class="btn-label">生成一条</span>
         </button>
+        <button id="demoBtn" class="btn ghost" type="button">
+          <span class="btn-label">看示例</span>
+        </button>
         <button id="settingsBtn" class="btn ghost" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
           <span class="btn-label">设置</span>
@@ -60,7 +63,7 @@
           <strong>还差一点就能用了</strong>
           <p>记忆、日记或人格路径还没填全。补上之后，她才知道该记得谁。</p>
         </div>
-        <button id="onboardBtn" class="btn primary" type="button">去补全</button>
+        <button id="onboardBtn" class="btn primary" type="button">一键配置</button>
       </div>
 
       <div class="list-head">
@@ -104,11 +107,20 @@
 
         <form id="settingsForm" class="settings-form">
           <section class="field-group">
+            <h3>体检</h3>
+            <button id="doctorBtn" class="btn ghost small" type="button">检查配置</button>
+            <div id="doctorList" class="doctor-list"></div>
+          </section>
+
+          <details class="advanced">
+            <summary>高级设置：路径</summary>
+          <section class="field-group">
             <h3>基础路径</h3>
             <label>记忆文件<input data-key="memory_file" type="text" placeholder="memory.json 路径" /></label>
             <label>日记目录<input data-key="diary_dir" type="text" placeholder="大肥鱼日记 路径" /></label>
             <label>人格文件<input data-key="persona_file" type="text" placeholder="人格 .md 路径" /></label>
           </section>
+          </details>
 
           <section class="field-group">
             <h3>形象</h3>

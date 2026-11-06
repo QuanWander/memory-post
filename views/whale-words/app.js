@@ -44,9 +44,13 @@ const variantList = document.getElementById("variantList");
 const variantAdd = document.getElementById("variantAdd");
 const onboardingBanner = document.getElementById("onboardingBanner");
 const onboardBtn = document.getElementById("onboardBtn");
+const demoBtn = document.getElementById("demoBtn");
+const doctorBtn = document.getElementById("doctorBtn");
+const doctorList = document.getElementById("doctorList");
 
 let toastTimer = null;
 let angleOptions = [];
+let onboardingData = null;
 
 function esc(text) {
   return String(text ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -423,7 +427,74 @@ if (!hadPluginBridge) {
   }
   settingsForm.addEventListener("submit", saveSettings);
   variantAdd.addEventListener("click", () => addVariantCard());
-  onboardBtn.addEventListener("click", openSettings);
+  onboardBtn.addEventListener("click", autoConfigure);
+  doctorBtn.addEventListener("click", runDoctor);
+  demoBtn.addEventListener("click", showDemo);
+}
+
+async function autoConfigure() {
+  const candidates = (onboardingData && onboardingData.candidates) || {};
+  const payload = {};
+  for (const key of ["memory_file", "diary_dir", "persona_file"]) {
+    const list = candidates[key] || [];
+    if (list.length) payload[key] = list[0];
+  }
+  if (!Object.keys(payload).length) {
+    openSettings();
+    return;
+  }
+  try {
+    await bridge.apiPost("onboarding/apply", payload);
+    toast("已经自动填好，接着补剩下的一两项就行");
+    await checkOnboarding();
+    await openSettings();
+  } catch (error) {
+    toast("自动配置失败：" + error.message, true);
+    openSettings();
+  }
+}
+
+async function showDemo() {
+  try {
+    const data = await bridge.apiGet("demo");
+    const text = (data.examples || []).map((item) => `【${item.label}】\n${item.text}`).join("\n\n");
+    await ask("她写出来是这样", text || "暂无示例", "知道了", true);
+  } catch (error) {
+    toast("示例加载失败：" + error.message, true);
+  }
+}
+
+async function runDoctor() {
+  doctorBtn.disabled = true;
+  doctorBtn.textContent = "检查中…";
+  try {
+    const data = await bridge.apiGet("doctor");
+    doctorList.innerHTML = "";
+    const labels = { green: "正常", yellow: "注意", red: "要修" };
+    for (const item of data.items || []) {
+      const row = document.createElement("div");
+      row.className = `doctor-row ${item.status}`;
+      const dot = document.createElement("span");
+      dot.className = "doctor-dot";
+      const text = document.createElement("div");
+      text.className = "doctor-text";
+      text.innerHTML = `<strong>${esc(item.label)}</strong><span>${esc(item.detail)}</span>`;
+      row.append(dot, text);
+      if (item.action === "auto") {
+        const fix = button("自动找", "btn ghost small", autoConfigure);
+        row.appendChild(fix);
+      } else if (item.action === "settings") {
+        row.appendChild(button("去设置", "btn ghost small", openSettings));
+      }
+      doctorList.appendChild(row);
+      row.title = labels[item.status] || "";
+    }
+  } catch (error) {
+    doctorList.textContent = "检查失败：" + error.message;
+  } finally {
+    doctorBtn.disabled = false;
+    doctorBtn.textContent = "检查配置";
+  }
 }
 
 async function loadAngles() {
@@ -439,9 +510,11 @@ async function checkOnboarding() {
   if (!hadPluginBridge) return;
   try {
     const data = await bridge.apiGet("onboarding/status");
+    onboardingData = data;
     onboardingBanner.hidden = Boolean(data.ready);
     onboardingBanner.style.display = data.ready ? "none" : "flex";
   } catch {
+    onboardingData = null;
     onboardingBanner.hidden = true;
     onboardingBanner.style.display = "none";
   }

@@ -340,3 +340,24 @@ h1 {
 .privacy-report { margin-top: 10px; font-size: 12px; color: var(--muted); }
 .privacy-report summary { cursor: pointer; color: #d96a9c; }
 .privacy-report ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.65; }
+
+/* 0.5.0 傻瓜式配置 */
+.advanced { margin-bottom: 14px; border-radius: 16px; }
+.advanced > summary {
+  cursor: pointer; font-size: 12px; color: var(--muted); padding: 9px 12px;
+  border: 1px dashed rgba(185, 161, 255, .4); border-radius: 12px;
+}
+.advanced[open] > summary { margin-bottom: 10px; }
+.doctor-list { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.doctor-row {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+  border-radius: 12px; background: rgba(255,255,255,.55); font-size: 12px;
+}
+[data-theme="dark"] .doctor-row { background: rgba(255,255,255,.05); }
+.doctor-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #b9b3c9; }
+.doctor-row.green .doctor-dot { background: #5fbf8f; }
+.doctor-row.yellow .doctor-dot { background: #e8b45a; }
+.doctor-row.red .doctor-dot { background: #e06c9f; }
+.doctor-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.doctor-text span { color: var(--muted); font-size: 11.5px; }
+#modalText { white-space: pre-line; }

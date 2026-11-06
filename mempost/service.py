@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from . import config as cfgmod
+from . import demo as demo_mod
 from .comments import new_comments, normalize_post, reply_text, self_uin
 from .composer import ANGLES, ANGLE_MAP, LLM, compose
 from .images import build_prompt, generate
@@ -256,6 +257,29 @@ def regenerate_draft(config_path: str | Path, draft_id: str, angle_id: str | Non
     return {"ok": True, "draft": item, "text": result["text"], "used": result.get("used") or [], "angle": result.get("angle")}
 
 
+def demo() -> list[dict]:
+    return demo_mod.examples()
+
+
+def _detect_candidates(config_path: Path) -> dict:
+    roots = [Path.cwd() / "data", config_path.parent / "data", config_path.parent]
+    memory: list[str] = []
+    for root in roots:
+        for p in sorted((root / "plugin_data").glob("*/memory.json")) if (root / "plugin_data").exists() else []:
+            if p.is_file() and str(p) not in memory:
+                memory.append(str(p))
+    diary: list[str] = []
+    for p in (Path.cwd() / "大肥鱼日记", config_path.parent / "大肥鱼日记"):
+        if p.is_dir() and str(p) not in diary:
+            diary.append(str(p))
+    persona: list[str] = []
+    for d in diary:
+        for p in sorted((Path(d) / "小鲸鱼" / "人格").glob("*.md")):
+            if p.is_file() and str(p) not in persona:
+                persona.append(str(p))
+    return {"memory_file": memory, "diary_dir": diary, "persona_file": persona}
+
+
 def _detect_paths(config_path: Path) -> dict:
     roots = [Path.cwd() / "data", config_path.parent / "data", config_path.parent]
     detected = {"memory_file": "", "diary_dir": "", "persona_file": ""}
@@ -281,6 +305,7 @@ def onboarding_status(config_path: str | Path) -> dict:
         "diary_dir": cfgmod.resolve(cfg, "diary_dir", path),
         "persona_file": cfgmod.resolve(cfg, "persona_file", path),
         "detected": _detect_paths(path),
+        "candidates": _detect_candidates(path),
     }
 
 
