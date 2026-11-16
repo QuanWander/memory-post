@@ -1,0 +1,9 @@
+{
+  "name": "@quanwander/dsh-memory-post",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH bundle: 鲸语拾光 MCP",
+  "files": ["cordis.patch.yml", "README.md", "docs", "icon.svg"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}
