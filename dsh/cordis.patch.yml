@@ -1,0 +1,10 @@
+- insert:
+    - id: memory-post-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: memory_post
+        transport: stdio
+        command: 'E:\QQ机器人\AstrBot\.venv\Scripts\python.exe'
+        args: ['-m', 'adapters.mcp.server', '--config', 'config.local.json']
+        cwd: 'E:\QQ机器人\发布\memory-post'
+        failOnStartupError: true
